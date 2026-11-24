@@ -1,0 +1,93 @@
+// @Author: Jonathan Serna
+// @Date:   2026-11-23 21:00:30
+// @Last Modified by:   Jonathan Serna
+// @Last Modified time: 2026-11-23 21:00:30
+
+/**
+ * POST /api/rooms/[code]/finish — Mark a match finished and reward
+ * FrankenCoins (+60 winner, +30 participant) to the authenticated player.
+ */
+
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { createSupabaseServerClient } from "@/infrastructure/supabase/server";
+
+const WINNER_REWARD_COINS = 60;
+const PARTICIPANT_REWARD_COINS = 30;
+
+const finishSchema = z.object({
+  winnerPlayerId: z.string().uuid(),
+});
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ code: string }> }
+): Promise<NextResponse> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "No autenticado." }, { status: 401 });
+    }
+
+    const parsed = finishSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Payload invalido." }, { status: 400 });
+    }
+
+    const { code } = await context.params;
+    const normalizedCode = code.trim().toUpperCase();
+
+    const { data: room } = await supabase
+      .from("game_rooms")
+      .select("code, host_user_id, guest_user_id, status")
+      .eq("code", normalizedCode)
+      .maybeSingle();
+
+    if (
+      !room ||
+      (room.host_user_id !== user.id && room.guest_user_id !== user.id)
+    ) {
+      return NextResponse.json(
+        { error: "No participas en esta sala." },
+        { status: 403 }
+      );
+    }
+
+    if (room.host_user_id === user.id && room.status !== "finished") {
+      await supabase
+        .from("game_rooms")
+        .update({
+          status: "finished",
+          winner_user_id: parsed.data.winnerPlayerId,
+        })
+        .eq("code", normalizedCode);
+    }
+
+    const reward =
+      parsed.data.winnerPlayerId === user.id
+        ? WINNER_REWARD_COINS
+        : PARTICIPANT_REWARD_COINS;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("coins")
+      .eq("id", user.id)
+      .single();
+
+    const nextCoins = ((profile?.coins as number | undefined) ?? 0) + reward;
+    await supabase
+      .from("profiles")
+      .update({ coins: nextCoins })
+      .eq("id", user.id);
+
+    return NextResponse.json({ rewardCoins: reward, coins: nextCoins });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error inesperado.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
