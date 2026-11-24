@@ -151,6 +151,38 @@ El usuario propuso y validó guardar todos los visuales (PNG o SVG) en un bucket
 - `pnpm run lint`: **0 errores, 0 advertencias**.
 - `pnpm run build`: **Compilación limpia (`14/14` rutas)**.
 
+---
+
+## 11. Iteración 6 — Rediseño Estético Bio-Industrial (Grafito + Verde Radioactivo + Cobre Cyberpunk) y Popout TCG con `/anatomy` + `motion`
+
+### Decisiones de Diseño (`DESIGN.md` & Sistema Técnico de Planos)
+- **Paleta Bio-Industrial + Cyberpunk Cobre (sin negro puro `#000000`):**
+  - Fondos grafito carbón `#141418` (`--bg-canvas`), `#16161B` (`--bg-sheet` para desvanecimiento de bordes), celdas punteadas `#15151A` (`.blueprint-dots`), y placas mecanizadas `#1B1C22` / `#22242C`.
+  - Acentos **Verde Radioactivo Experimental** (`#52FF2E` / `#32C81E`) combinados con **Cobre Cyberpunk / Bronce** (`#D47E3F` / `#EB9C5C`) y texto de alto contraste (`#ECEAE4` / `#B0AEA6` / `#8E8D86`).
+  - **Geometría de hoja técnica:** `0px` de radio (`rounded-none`), cero cajas anidadas, divisores de `1px` que se difuminan hacia `#16161B` en los 4 bordes (`.sheet-rule-h`, `.sheet-rule-v`, `.sheet-cell-edge-*`), tipografía industrial `Chakra Petch` + `Barlow` + `JetBrains Mono`.
+- **Hoja Técnica de 5 Columnas con Mecanismos Isométricos (`/anatomy`):**
+  - **`src/components/iso/isoGeometry.ts`:** librería tipada TypeScript pura de proyección isométrica, extrusión en 4 tonos grafito (`#181920`, `#1E2028`, `#252731`, `#2E313D`), biseles, escalas Vernier y diales radiales.
+  - **`src/components/blueprint/BlueprintFigureCell.tsx` y `src/components/blueprint/BlueprintSheetSection.tsx`:** hoja técnica de 5 columnas con celdas punteadas (`FIG_01..FIG_04`), mecanismos físicos isométricos sólidos con una única pieza focal iluminada (`#52FF2E` o `#D47E3F`), interacción hover/clic y pausa automática fuera de pantalla mediante `IntersectionObserver`.
+- **Popout Detallado de Apertura de Sobres TCG (`motion` v14.14.0 + `/anatomy`):**
+  - Dependencia aprobada e instalada: **`motion`** (`motion/react`).
+  - **`src/components/gacha/AnatomyBoosterPackSvg.tsx`:** sobre bio-industrial isométrico sólido en grafito/cobre con banda selladora radioactiva `#52FF2E` y animación de desgarro al pulsar o deslizar.
+  - **`src/components/gacha/PackOpeningModal.tsx`:** modal popout inmersivo en 3 fases: (1) sobre sellado isométrico, (2) mazo apilado interactivo donde cada carta se voltea en 3D y se desliza hacia izquierda o derecha con física `motion` (`useMotionValue`, `useTransform`, `AnimatePresence`), y (3) bandeja de resumen con saldo de FrankenCoins por repetidas.
+- **Preservación Estricta de Lógica y Arena:**
+  - Cero cambios en `src/domain/`, `src/app/api/`, `src/network/` o mecánica de combate.
+  - En **`src/engine/ArenaCanvas.tsx`**, **`src/components/arena/ArtilleryDialGauge.tsx`** y la vista activa de **`src/app/arena/[code]/page.tsx`** solo se actualizó la colorimetría (cielo smog grafito-cobre, corteza `#52FF2E`, arcos de puntería cobre `#EB9C5C`, minimapa y HUD carbón/cobre/verde) manteniendo intactos controles, cámara y zoom.
+
+### Resultados de Verificación — Iteración 6 (2026-11-23)
+- `pnpm test` (`vitest run`): **15/15 pruebas unitarias en verde**.
+- `pnpm exec tsc --noEmit`: **0 errores**.
+- `pnpm run lint`: **0 errores, 0 advertencias**.
+- `pnpm run build`: **Compilación de producción limpia (`14/14` rutas)**.
+
+---
+
+## 12. Documentación Operativa (`README.md`)
+- Se creó **`README.md`** en la raíz del repositorio con la guía paso a paso para clonar el proyecto, configurar `.env.local`, aplicar las 3 migraciones SQL en Supabase (vía CLI o SQL Editor), generar/subir los 13 SVGs al bucket `parts-assets`, configurar Auth/Realtime y lanzar el servidor de juego en desarrollo, LAN (`-H 0.0.0.0`) y producción.
+
+
 
 
 

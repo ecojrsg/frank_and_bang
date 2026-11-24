@@ -3,30 +3,32 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:03:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 21:03:00
+// @Last Modified time: 2026-11-23 23:36:00
 
 /**
- * Pokémon TCG-style Gacha pack opening screen and full catalog collection
- * hydrated from public.parts_catalog and Supabase Storage "parts-assets".
+ * Pokémon TCG Pocket-inspired Gacha pack station and catalog collection
+ * hydrated from public.parts_catalog and Supabase Storage "parts-assets",
+ * launching an immersive isometric tear + swipeable card popout modal.
  */
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { AnatomyBoosterPackSvg } from "@/components/gacha/AnatomyBoosterPackSvg";
+import { PackOpeningModal } from "@/components/gacha/PackOpeningModal";
 import { Navbar } from "@/components/layout/Navbar";
 import { TcgPartCard } from "@/components/parts/TcgPartCard";
 import { PACK_COST_COINS } from "@/domain/gachaEngine";
 import type { GachaPullResult } from "@/domain/types";
-import { soundEngine } from "@/engine/soundEngine";
 import type { PlayerFullState } from "@/infrastructure/supabase/partsRepository";
 
 export default function GachaPage() {
   const router = useRouter();
   const [state, setState] = useState<PlayerFullState | null>(null);
   const [pulls, setPulls] = useState<GachaPullResult[]>([]);
-  const [revealedFlags, setRevealedFlags] = useState<boolean[]>([]);
   const [lastBonusCoins, setLastBonusCoins] = useState(0);
   const [opening, setOpening] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
@@ -39,7 +41,7 @@ export default function GachaPage() {
     if (res.ok) {
       setState(data);
     } else {
-      setErrorMessage(data.error ?? "Error al cargar el catalogo.");
+      setErrorMessage(data.error ?? "Error al cargar el catálogo.");
     }
   }, [router]);
 
@@ -61,10 +63,9 @@ export default function GachaPage() {
         throw new Error(data.error ?? "No se pudo abrir el sobre.");
       }
 
-      soundEngine.playPackOpen();
       setPulls(data.pulls);
-      setRevealedFlags(data.pulls.map(() => false));
       setLastBonusCoins(data.totalDuplicateCoins ?? 0);
+      setModalOpen(true);
       await loadState();
     } catch (error) {
       setErrorMessage(
@@ -86,25 +87,9 @@ export default function GachaPage() {
     await loadState();
   }
 
-  function flipCard(index: number) {
-    const target = pulls[index];
-    if (target && !revealedFlags[index]) {
-      soundEngine.playCardFlip(target.part.rarity);
-    }
-    setRevealedFlags((prev) => prev.map((flag, i) => (i === index ? true : flag)));
-  }
-
-  function flipAllCards() {
-    const firstUnflipped = pulls.find((_, index) => !revealedFlags[index]);
-    if (firstUnflipped) {
-      soundEngine.playCardFlip(firstUnflipped.part.rarity);
-    }
-    setRevealedFlags((prev) => prev.map(() => true));
-  }
-
   if (!state) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 text-sm text-slate-300">
+      <main className="flex min-h-screen items-center justify-center bg-[#141418] p-6 font-mono text-xs text-[#B0AEA6]">
         {errorMessage ?? "Cargando sobres desde Supabase..."}
       </main>
     );
@@ -117,118 +102,138 @@ export default function GachaPage() {
     state.profile.freePacks > 0 || state.profile.coins >= PACK_COST_COINS;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#141418]">
       <Navbar
         displayName={state.profile.displayName}
         coins={state.profile.coins}
         freePacks={state.profile.freePacks}
       />
 
-      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-        {/* Pack opening stage */}
-        <section className="rounded-2xl border border-amber-400/30 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 p-6 shadow-2xl">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-amber-300">
-                Sobres Coleccionables · 3 Cartas por Sobre
-              </span>
-              <h1 className="mt-1 text-2xl font-black text-white">
-                Gacha del Laboratorio
-              </h1>
-              <p className="mt-1 text-xs text-slate-300">
-                Probabilidades: <strong>70% Normal</strong> ·{" "}
-                <strong className="text-sky-300">24% Rara</strong> ·{" "}
-                <strong className="text-amber-300">6% Unica</strong>. Las cartas
-                repetidas otorgan FrankenCoins automaticamente.
-              </p>
+      <main className="mx-auto max-w-6xl space-y-10 px-4 py-8">
+        {/* Pack Opening Chamber Sheet */}
+        <section className="bg-[#16161B]">
+          <div className="sheet-rule-h" />
+
+          <div className="grid grid-cols-1 lg:grid-cols-5">
+            <div className="sheet-cell-edge-b sheet-cell-edge-r flex flex-col justify-between p-6 sm:p-8 lg:col-span-3">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-[#ECEAE4] sm:text-4xl">
+                  Cámara de Sobres TCG
+                </h1>
+                <p className="mt-3 max-w-[52ch] font-mono text-xs leading-relaxed text-[#B0AEA6]">
+                  Cada sobre contiene 3 piezas de criatura con probabilidad de{" "}
+                  <strong className="text-[#ECEAE4]">70% Normal</strong> ·{" "}
+                  <strong className="text-[#EB9C5C]">24% Rara</strong> ·{" "}
+                  <strong className="text-[#52FF2E]">6% Única</strong>. Las
+                  repetidas otorgan FrankenCoins automáticamente.
+                </p>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                {canOpen ? (
+                  <button
+                    type="button"
+                    disabled={opening}
+                    onClick={handleOpenPack}
+                    className="bg-[#D47E3F] px-6 py-3 font-mono text-xs font-bold tracking-widest text-[#121216] uppercase transition hover:bg-[#EB9C5C] disabled:opacity-60"
+                  >
+                    {opening
+                      ? "Despresurizando..."
+                      : state.profile.freePacks > 0
+                        ? `Abrir Sobre Gratis (${state.profile.freePacks})`
+                        : `Comprar Sobre (${PACK_COST_COINS} FC)`}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleClaimRefill}
+                    className="border border-[#52FF2E] bg-[#52FF2E]/15 px-5 py-3 font-mono text-xs font-bold tracking-wider text-[#52FF2E] uppercase transition hover:bg-[#52FF2E]/25"
+                  >
+                    Recargar 1 Sobre de Prueba Gratis
+                  </button>
+                )}
+
+                {pulls.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setModalOpen(true)}
+                    className="border border-[#3A3D4A] bg-[#1B1C22] px-4 py-3 font-mono text-xs font-bold text-[#ECEAE4] uppercase transition hover:border-[#D47E3F]"
+                  >
+                    Reabrir Último Sobre
+                  </button>
+                )}
+              </div>
+
+              {errorMessage && (
+                <div className="mt-4 border border-[#E84A5F]/60 bg-[#E84A5F]/15 px-3 py-2 font-mono text-xs text-[#ECEAE4]">
+                  {errorMessage}
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              {canOpen ? (
-                <button
-                  type="button"
-                  disabled={opening}
-                  onClick={handleOpenPack}
-                  className="rounded-xl bg-amber-400 px-6 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-400/20 transition hover:bg-amber-300 disabled:opacity-60"
-                >
-                  {opening
-                    ? "Abriendo sobre..."
-                    : state.profile.freePacks > 0
-                      ? `Abrir Sobre Gratis (${state.profile.freePacks})`
-                      : `Comprar Sobre (${PACK_COST_COINS} FC)`}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleClaimRefill}
-                  className="rounded-xl border border-emerald-400/60 bg-emerald-500/15 px-5 py-3 text-sm font-bold text-emerald-200 transition hover:bg-emerald-500/25"
-                >
-                  Recargar 1 Sobre de Prueba Gratis
-                </button>
-              )}
+            {/* Right 2 cols: Interactive Isometric Booster Pack Trigger */}
+            <div className="blueprint-dots sheet-cell-edge-b flex flex-col items-center justify-between p-6 lg:col-span-2">
+              <div className="flex w-full justify-between font-mono text-[10px] tracking-[0.12em] text-[#8E8D86]">
+                <span>FIG_PACK</span>
+                <span className="text-[#52FF2E]">
+                  {canOpen ? "CLIC PARA RASGAR" : "SIN SOBRES"}
+                </span>
+              </div>
 
-              {pulls.length > 0 && revealedFlags.some((flag) => !flag) && (
-                <button
-                  type="button"
-                  onClick={flipAllCards}
-                  className="rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold text-slate-200 hover:border-slate-500"
-                >
-                  Voltear Todas
-                </button>
-              )}
+              <AnatomyBoosterPackSvg
+                tearing={false}
+                disabled={!canOpen || opening}
+                compact
+                onTear={() => {
+                  if (canOpen && !opening) {
+                    void handleOpenPack();
+                  }
+                }}
+              />
+
+              <div className="flex w-full justify-between font-mono text-[10px] text-[#8E8D86] tabular-nums">
+                <span>DISPONIBLES: {state.profile.freePacks}</span>
+                <span className="text-[#EB9C5C]">{state.profile.coins} FC</span>
+              </div>
             </div>
           </div>
 
-          {errorMessage && (
-            <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-              {errorMessage}
-            </div>
-          )}
-
-          {pulls.length > 0 ? (
-            <div className="mt-6 space-y-4">
+          {pulls.length > 0 && (
+            <div className="sheet-cell-edge-b p-6">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
+                <span className="font-bold text-[#52FF2E]">
+                  ÚLTIMA APERTURA ({pulls.length} CARTAS)
+                </span>
+                {lastBonusCoins > 0 && (
+                  <span className="text-[#EB9C5C] tabular-nums">
+                    +{lastBonusCoins} FC por repetidas
+                  </span>
+                )}
+              </div>
               <div className="grid gap-5 sm:grid-cols-3">
-                {pulls.map((pull, index) => (
+                {pulls.map((pull, idx) => (
                   <TcgPartCard
-                    key={`${pull.part.id}-${index}`}
+                    key={`${pull.part.id}-${idx}`}
                     part={pull.part}
                     cardBackUrl={state.cardBackUrl}
-                    revealed={revealedFlags[index] ?? false}
-                    onFlip={() => flipCard(index)}
+                    revealed={true}
                     isNew={pull.isNew}
                     duplicateCoins={pull.duplicateCoins}
                   />
                 ))}
               </div>
-              {revealedFlags.every(Boolean) && lastBonusCoins > 0 && (
-                <p className="text-center text-xs font-semibold text-amber-300">
-                  Recibiste +{lastBonusCoins} FrankenCoins por cartas repetidas.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-xl border border-dashed border-slate-700 bg-slate-950/60 p-10 text-center">
-              <p className="text-sm font-semibold text-slate-200">
-                Pulsa el boton superior para rasgar un sobre y descubrir 3
-                piezas de criatura.
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Cada tarjeta consulta tu inventario en Supabase y descarga su
-                arte directamente del bucket <code>parts-assets</code>.
-              </p>
             </div>
           )}
         </section>
 
-        {/* Full catalog collection */}
+        {/* Full Catalog Collection */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white">
-              Coleccion Completa ({state.inventory.length}/{state.catalog.length})
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D47E3F]/25 pb-3">
+            <h2 className="text-2xl font-bold text-[#ECEAE4]">
+              Colección Completa ({state.inventory.length}/{state.catalog.length})
             </h2>
-            <span className="text-xs text-slate-400">
-              Fuente en vivo: <code>public.parts_catalog</code> + bucket{" "}
-              <code>parts-assets</code>
+            <span className="font-mono text-xs text-[#8E8D86]">
+              public.parts_catalog · parts-assets
             </span>
           </div>
 
@@ -249,6 +254,18 @@ export default function GachaPage() {
           </div>
         </section>
       </main>
+
+      <PackOpeningModal
+        isOpen={modalOpen}
+        pulls={pulls}
+        totalDuplicateCoins={lastBonusCoins}
+        cardBackUrl={state.cardBackUrl}
+        freePacksRemaining={state.profile.freePacks}
+        coinsRemaining={state.profile.coins}
+        openingAnother={opening}
+        onOpenAnother={() => void handleOpenPack()}
+        onClose={() => setModalOpen(false)}
+      />
     </div>
   );
 }

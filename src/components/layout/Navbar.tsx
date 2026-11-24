@@ -3,11 +3,11 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:03:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 21:03:00
+// @Last Modified time: 2026-11-23 23:36:00
 
 /**
- * Persistent top navigation bar displaying active route, FrankenCoins,
- * available free Gacha packs, and sign-out action.
+ * Persistent top command bar styled as a sharp charcoal-graphite, copper, and
+ * radioactive bio-green technical strip displaying route links, packs, and FC.
  */
 
 import Link from "next/link";
@@ -28,7 +28,7 @@ const NAV_LINKS = [
 ];
 
 /**
- * Render the authenticated navigation header for Frank and Bang.
+ * Render the authenticated technical command navigation header for Frank and Bang.
  */
 export function Navbar({ displayName, coins, freePacks }: NavbarProps) {
   const pathname = usePathname();
@@ -42,30 +42,30 @@ export function Navbar({ displayName, coins, freePacks }: NavbarProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur">
+    <header className="sticky top-0 z-30 bg-[#15151A]/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-6">
           <Link
             href="/menu"
-            className="flex items-center gap-2 font-black tracking-tight text-emerald-300"
+            className="flex items-center gap-2.5 font-display text-lg font-bold tracking-tight text-[#ECEAE4]"
           >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-400/50 bg-emerald-500/15 text-sm">
+            <span className="inline-flex h-7 w-7 items-center justify-center border border-[#D47E3F] bg-[#1B1C22] font-mono text-xs font-bold text-[#52FF2E]">
               FB
             </span>
-            <span className="text-lg">Frank &amp; Bang</span>
+            <span>Frank &amp; Bang</span>
           </Link>
 
-          <nav className="flex items-center gap-1.5">
+          <nav className="flex items-center gap-1">
             {NAV_LINKS.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  className={`border-b-2 px-3 py-1.5 font-mono text-xs font-bold tracking-wider uppercase transition ${
                     active
-                      ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/40"
-                      : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                      ? "border-[#52FF2E] bg-[#1B1C22] text-[#52FF2E]"
+                      : "border-transparent text-[#B0AEA6] hover:border-[#D47E3F]/60 hover:text-[#ECEAE4]"
                   }`}
                 >
                   {item.label}
@@ -75,23 +75,24 @@ export function Navbar({ displayName, coins, freePacks }: NavbarProps) {
           </nav>
         </div>
 
-        <div className="flex items-center gap-2.5 text-xs sm:text-sm">
-          <span className="rounded-full border border-sky-400/40 bg-sky-500/15 px-3 py-1 font-semibold text-sky-200">
-            Sobres: {freePacks}
+        <div className="flex items-center gap-3 font-mono text-xs tabular-nums">
+          <span className="border-r border-[#2E313D] pr-3 text-[#52FF2E]">
+            SOBRES: {freePacks}
           </span>
-          <span className="rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1 font-semibold text-amber-200">
+          <span className="border-r border-[#2E313D] pr-3 text-[#EB9C5C]">
             {coins} FC
           </span>
-          <span className="hidden text-slate-300 sm:inline">{displayName}</span>
+          <span className="hidden text-[#B0AEA6] sm:inline">{displayName}</span>
           <button
             type="button"
             onClick={handleSignOut}
-            className="rounded-lg border border-slate-700 px-2.5 py-1 text-xs font-medium text-slate-300 transition hover:border-rose-400/60 hover:text-rose-200"
+            className="border border-[#3A3D4A] bg-[#1B1C22] px-2.5 py-1 text-[11px] font-bold tracking-wider text-[#B0AEA6] uppercase transition hover:border-[#E84A5F] hover:text-[#E84A5F]"
           >
             Salir
           </button>
         </div>
       </div>
+      <div className="sheet-rule-h" />
     </header>
   );
 }

@@ -1,16 +1,222 @@
 @import "tailwindcss";
 
+@theme inline {
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, Menlo, Consolas, monospace;
+}
+
 :root {
   color-scheme: dark;
+  --bg-canvas: #141418;
+  --bg-sheet: #16161b;
+  --bg-dot-cell: #15151a;
+  --bg-plate: #1b1c22;
+  --bg-plate-elevated: #22242c;
+  --bio-green: #52ff2e;
+  --bio-green-mid: #32c81e;
+  --copper: #d47e3f;
+  --copper-hi: #eb9c5c;
+  --copper-lo: #8a4c24;
+  --ink-primary: #eceae4;
+  --ink-secondary: #b0aea6;
+  --ink-muted: #8e8d86;
+  --danger: #e84a5f;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #383a46 #16161b;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #16161b;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #383a46;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #d47e3f;
+}
+
+::selection {
+  background: rgba(82, 255, 46, 0.25);
+  color: #eceae4;
+}
+
+input,
+textarea {
+  caret-color: #52ff2e;
+}
+
+:focus-visible {
+  outline: 1px solid #52ff2e;
+  outline-offset: 2px;
 }
 
 body {
-  background: radial-gradient(circle at top, #131c2e 0%, #090d16 65%);
-  color: #e5edf8;
+  background-color: var(--bg-canvas);
+  color: var(--ink-primary);
   min-height: 100vh;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
 }
 
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dotted blueprint technical cell (#15151A) */
+.blueprint-dots {
+  background-color: #15151a;
+  background-image: radial-gradient(rgba(236, 234, 228, 0.14) 1px,
+      transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* 1px horizontal hairline fading toward #16161B at both ends */
+.sheet-rule-h {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg,
+      #16161b 0%,
+      rgba(212, 126, 63, 0.36) 14%,
+      rgba(236, 234, 228, 0.16) 50%,
+      rgba(212, 126, 63, 0.36) 86%,
+      #16161b 100%);
+}
+
+/* 1px vertical hairline fading toward #16161B at top and bottom */
+.sheet-rule-v {
+  width: 1px;
+  align-self: stretch;
+  background: linear-gradient(180deg,
+      #16161b 0%,
+      rgba(212, 126, 63, 0.32) 14%,
+      rgba(236, 234, 228, 0.14) 50%,
+      rgba(212, 126, 63, 0.32) 86%,
+      #16161b 100%);
+}
+
+/* Blueprint cell border edges fading seamlessly into #16161B */
+.sheet-cell-edge-b {
+  position: relative;
+}
+
+.sheet-cell-edge-b::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+      #16161b 0%,
+      rgba(236, 234, 228, 0.15) 14%,
+      rgba(212, 126, 63, 0.32) 50%,
+      rgba(236, 234, 228, 0.15) 86%,
+      #16161b 100%);
+}
+
+.sheet-cell-edge-r {
+  position: relative;
+}
+
+.sheet-cell-edge-r::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+      #16161b 0%,
+      rgba(236, 234, 228, 0.14) 14%,
+      rgba(212, 126, 63, 0.28) 50%,
+      rgba(236, 234, 228, 0.14) 86%,
+      #16161b 100%);
+}
+
+/* 4-tone isometric mechanism palette & calm offscreen-pausable motion */
+.iso-mech {
+  --iso-paper: #15151a;
+  --iso-shade-0: #181920;
+  --iso-shade-1: #1e2028;
+  --iso-shade-2: #252731;
+  --iso-shade-3: #2e313d;
+  --iso-top: #262832;
+  --iso-edge: #6f7282;
+  --iso-crease: #393c49;
+  --iso-tick: #8e8d86;
+  --iso-focal-green: #52ff2e;
+  --iso-focal-green-shade: #236e17;
+  --iso-focal-green-top: #2f8c21;
+  --iso-focal-copper: #d47e3f;
+  --iso-focal-copper-shade: #6e3b18;
+  --iso-focal-copper-top: #9e5827;
+}
+
+@keyframes mech-breathe {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(0, -4px);
+  }
+}
+
+@keyframes mech-slide {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(16px, 9px);
+  }
+}
+
+.iso-calm-breathe {
+  animation: mech-breathe 5.2s cubic-bezier(0.32, 0.72, 0, 1) infinite;
+}
+
+.iso-calm-slide {
+  animation: mech-slide 6.4s cubic-bezier(0.32, 0.72, 0, 1) infinite;
+}
+
+[data-paused="true"] .iso-calm-breathe,
+[data-paused="true"] .iso-calm-slide {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .iso-calm-breathe,
+  .iso-calm-slide {
+    animation: none;
+  }
+}
+
+/* TCG 3D card perspective */
 .tcg-perspective {
   perspective: 1100px;
 }

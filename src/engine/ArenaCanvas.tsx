@@ -3,7 +3,7 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:06:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 23:08:00
+// @Last Modified time: 2026-11-23 23:38:00
 
 /**
  * Full-viewport HTML5 Canvas 2D engine for dynamically sized destructible Worms
@@ -59,25 +59,25 @@ function drawParallaxBackdrop(
   camY: number
 ) {
   const sky = ctx.createLinearGradient(0, 0, 0, viewH);
-  sky.addColorStop(0, "#050914");
-  sky.addColorStop(0.55, "#0f1b3d");
-  sky.addColorStop(1, "#1e293b");
+  sky.addColorStop(0, "#0F1015");
+  sky.addColorStop(0.58, "#181A22");
+  sky.addColorStop(1, "#241E1A");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, viewW, viewH);
 
-  // Subtle parallax moon & starfield.
+  // Subtle parallax bio-green moon & copper-tinted atmospheric particles.
   const moonX = viewW * 0.78 - camX * 0.06;
   const moonY = Math.max(70, viewH * 0.18 - camY * 0.04);
-  ctx.fillStyle = "rgba(226, 232, 240, 0.14)";
+  ctx.fillStyle = "rgba(82, 255, 46, 0.1)";
   ctx.beginPath();
   ctx.arc(moonX, moonY, 46, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "rgba(248, 250, 252, 0.75)";
+  ctx.fillStyle = "rgba(236, 234, 228, 0.74)";
   ctx.beginPath();
   ctx.arc(moonX, moonY, 26, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "rgba(186, 230, 253, 0.38)";
+  ctx.fillStyle = "rgba(212, 126, 63, 0.36)";
   for (let i = 0; i < 60; i++) {
     const sx = ((i * 157 + 41) % 2400) - camX * 0.12;
     const sy = ((i * 89 + 29) % 520) - camY * 0.08;
@@ -86,12 +86,15 @@ function drawParallaxBackdrop(
     }
   }
 
-  // Distant Frankenstein lab spire silhouettes scrolling at 0.25x parallax.
-  ctx.fillStyle = "rgba(15, 23, 42, 0.65)";
+  // Distant industrial lab spire silhouettes with subtle copper edge trim.
+  ctx.fillStyle = "rgba(20, 21, 27, 0.82)";
+  ctx.strokeStyle = "rgba(212, 126, 63, 0.22)";
+  ctx.lineWidth = 1;
   for (let idx = 0; idx < 10; idx++) {
     const towerX = idx * 320 - (camX * 0.25) % 320;
     const towerH = 110 + ((idx * 47) % 85);
     ctx.fillRect(towerX, viewH - towerH, 86, towerH);
+    ctx.strokeRect(towerX, viewH - towerH, 86, towerH);
     ctx.beginPath();
     ctx.moveTo(towerX - 6, viewH - towerH);
     ctx.lineTo(towerX + 43, viewH - towerH - 34);
@@ -131,19 +134,19 @@ function drawWorldTerrain(
   ctx.closePath();
 
   const soil = ctx.createLinearGradient(0, worldH * 0.35, 0, worldH);
-  soil.addColorStop(0, "#334155");
-  soil.addColorStop(0.45, "#1e293b");
-  soil.addColorStop(1, "#090d16");
+  soil.addColorStop(0, "#2E313B");
+  soil.addColorStop(0.45, "#1E2027");
+  soil.addColorStop(1, "#131419");
   ctx.fillStyle = soil;
   ctx.fill();
 
-  // Grass/moss crust highlights carved explosion craters sharply.
+  // Radioactive bio-green crust highlights carved explosion craters sharply.
   ctx.beginPath();
   ctx.moveTo(startX, heightMap[startX]);
   for (let x = startX + 1; x <= endX; x++) {
     ctx.lineTo(x, heightMap[x]);
   }
-  ctx.strokeStyle = "#34d399";
+  ctx.strokeStyle = "#52FF2E";
   ctx.lineWidth = 4.5;
   ctx.stroke();
 }
@@ -167,7 +170,7 @@ function drawAimPreview(
   const startX = fighter.x + fighter.facing * 18;
   const startY = fighter.y - 32;
 
-  ctx.fillStyle = chargePower > 0 ? "#fbbf24" : "rgba(248, 250, 252, 0.72)";
+  ctx.fillStyle = chargePower > 0 ? "#EB9C5C" : "rgba(236, 234, 228, 0.72)";
   for (let step = 1; step <= 10; step++) {
     const t = step * 0.065;
     const px = startX + vx * t;
@@ -192,7 +195,7 @@ function drawMinimap(
   const scaleY = MINIMAP_HEIGHT / snapshot.terrainHeight;
 
   ctx.clearRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
-  ctx.fillStyle = "rgba(9, 13, 22, 0.9)";
+  ctx.fillStyle = "rgba(19, 20, 24, 0.92)";
   ctx.fillRect(0, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
 
   ctx.beginPath();
@@ -202,7 +205,7 @@ function drawMinimap(
   }
   ctx.lineTo(MINIMAP_WIDTH, MINIMAP_HEIGHT);
   ctx.closePath();
-  ctx.fillStyle = "#334155";
+  ctx.fillStyle = "#2E313B";
   ctx.fill();
 
   for (const fighter of snapshot.fighters) {
@@ -216,7 +219,7 @@ function drawMinimap(
   }
 
   if (snapshot.projectile) {
-    ctx.fillStyle = "#f97316";
+    ctx.fillStyle = "#D47E3F";
     ctx.beginPath();
     ctx.arc(
       snapshot.projectile.x * scaleX,
@@ -228,7 +231,7 @@ function drawMinimap(
     ctx.fill();
   }
 
-  ctx.strokeStyle = "#fbbf24";
+  ctx.strokeStyle = "#D47E3F";
   ctx.lineWidth = 1.5;
   ctx.strokeRect(
     camera.x * scaleX,
@@ -607,7 +610,7 @@ export function ArenaCanvas({
                   setZoomPercent(100);
                 }
               }}
-              className="rounded-full border border-sky-400/60 bg-slate-950/90 px-3 py-1 text-[11px] font-bold text-sky-200 shadow-lg hover:bg-sky-400/20"
+              className="border border-[#52FF2E]/60 bg-[#15151A]/90 px-3 py-1 font-mono text-[11px] font-bold text-[#52FF2E] shadow-lg hover:bg-[#52FF2E]/15"
             >
               Zoom {zoomPercent}% · Restablecer
             </button>
@@ -621,22 +624,22 @@ export function ArenaCanvas({
                   setIsScouting(false);
                 }
               }}
-              className="rounded-full border border-amber-400/60 bg-slate-950/90 px-3 py-1 text-[11px] font-bold text-amber-200 shadow-lg hover:bg-amber-400/20"
+              className="border border-[#D47E3F]/60 bg-[#15151A]/90 px-3 py-1 font-mono text-[11px] font-bold text-[#EB9C5C] shadow-lg hover:bg-[#D47E3F]/15"
             >
               Camara libre · Volver al atacante
             </button>
           )}
         </div>
-        <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950/85 p-1 shadow-2xl backdrop-blur">
+        <div className="overflow-hidden border border-[#D47E3F]/40 bg-[#15151A]/90 p-1 shadow-2xl backdrop-blur">
           <canvas
             ref={minimapRef}
             width={MINIMAP_WIDTH}
             height={MINIMAP_HEIGHT}
             onClick={handleMinimapClick}
             title="Haz clic en el minimapa o usa la rueda del raton para hacer zoom"
-            className="h-[74px] w-[180px] cursor-pointer rounded-lg sm:h-[90px] sm:w-[220px]"
+            className="h-[74px] w-[180px] cursor-pointer sm:h-[90px] sm:w-[220px]"
           />
-          <div className="mt-0.5 text-center text-[9px] font-semibold tracking-wider text-slate-400">
+          <div className="mt-0.5 text-center font-mono text-[9px] font-semibold tracking-wider text-[#8E8D86]">
             MINIMAPA · RUEDA: ZOOM · ARRASTRA PARA EXPLORAR
           </div>
         </div>

@@ -3,11 +3,12 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 22:00:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 22:00:00
+// @Last Modified time: 2026-11-23 23:36:00
 
 /**
  * Interactive dual live Canvas preview of the player's assembled creature
- * showing both the detailed Laboratory assembly and how it looks in 2D combat.
+ * showing both the detailed Laboratory pedestal and the live 2D combat slice
+ * in charcoal graphite, radioactive bio-green, and cyberpunk copper.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -42,10 +43,10 @@ export function CreaturePreviewPanel({
     const highest = getHighestLoadoutRarity(loadout);
     const teamColor =
       highest === "unique"
-        ? "#fbbf24"
+        ? "#52FF2E"
         : highest === "rare"
-          ? "#38bdf8"
-          : "#34d399";
+          ? "#D47E3F"
+          : "#B0AEA6";
 
     const renderFrame = (nowMs: number) => {
       const timeSec = nowMs / 1000;
@@ -59,31 +60,23 @@ export function CreaturePreviewPanel({
           const h = labCanvas.height;
           ctx.clearRect(0, 0, w, h);
 
-          const bg = ctx.createRadialGradient(w / 2, h * 0.48, 12, w / 2, h * 0.5, 160);
-          bg.addColorStop(0, "#1e293b");
-          bg.addColorStop(1, "#090d16");
+          const bg = ctx.createRadialGradient(w / 2, h * 0.48, 12, w / 2, h * 0.5, 165);
+          bg.addColorStop(0, "#1E2028");
+          bg.addColorStop(1, "#141418");
           ctx.fillStyle = bg;
           ctx.fillRect(0, 0, w, h);
 
-          // Blueprint grid lines.
-          ctx.strokeStyle = "rgba(148, 163, 184, 0.08)";
-          ctx.lineWidth = 1;
-          for (let gx = 20; gx < w; gx += 24) {
-            ctx.beginPath();
-            ctx.moveTo(gx, 0);
-            ctx.lineTo(gx, h);
-            ctx.stroke();
-          }
-          for (let gy = 20; gy < h; gy += 24) {
-            ctx.beginPath();
-            ctx.moveTo(0, gy);
-            ctx.lineTo(w, gy);
-            ctx.stroke();
+          // Technical blueprint dot matrix.
+          ctx.fillStyle = "rgba(236, 234, 228, 0.14)";
+          for (let gx = 16; gx < w; gx += 18) {
+            for (let gy = 16; gy < h; gy += 18) {
+              ctx.fillRect(gx, gy, 1.2, 1.2);
+            }
           }
 
-          // Illuminated metallic pedestal.
-          ctx.fillStyle = "#1e293b";
-          ctx.strokeStyle = "#475569";
+          // Copper-rimmed graphite pedestal.
+          ctx.fillStyle = "#1B1C22";
+          ctx.strokeStyle = "#D47E3F";
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.ellipse(w / 2, h * 0.84, 84, 16, 0, 0, Math.PI * 2);
@@ -104,7 +97,7 @@ export function CreaturePreviewPanel({
         }
       }
 
-      // 2. Mini in-game 2D Arena slice preview.
+      // 2. Mini in-game 2D Arena slice preview matching the updated Arena palette.
       const gameCanvas = gameCanvasRef.current;
       if (gameCanvas) {
         const ctx = gameCanvas.getContext("2d");
@@ -114,8 +107,8 @@ export function CreaturePreviewPanel({
           ctx.clearRect(0, 0, w, h);
 
           const sky = ctx.createLinearGradient(0, 0, 0, h);
-          sky.addColorStop(0, "#0b1120");
-          sky.addColorStop(1, "#1e293b");
+          sky.addColorStop(0, "#0F1015");
+          sky.addColorStop(1, "#1E2028");
           ctx.fillStyle = sky;
           ctx.fillRect(0, 0, w, h);
 
@@ -128,7 +121,7 @@ export function CreaturePreviewPanel({
           }
           ctx.lineTo(w, h);
           ctx.closePath();
-          ctx.fillStyle = "#1e293b";
+          ctx.fillStyle = "#252731";
           ctx.fill();
 
           ctx.beginPath();
@@ -137,7 +130,7 @@ export function CreaturePreviewPanel({
             if (px === 0) ctx.moveTo(px, groundY);
             else ctx.lineTo(px, groundY);
           }
-          ctx.strokeStyle = "#34d399";
+          ctx.strokeStyle = "#52FF2E";
           ctx.lineWidth = 3;
           ctx.stroke();
 
@@ -150,7 +143,7 @@ export function CreaturePreviewPanel({
             facing,
             aimAngleDeg: previewAngle,
             appearance,
-            teamColor: "#34d399",
+            teamColor: "#52FF2E",
             scale: 1,
             timeSec,
             isAlive: true,
@@ -160,12 +153,12 @@ export function CreaturePreviewPanel({
             maxHp: 100,
           });
 
-          // Animated aiming trajectory preview dots.
+          // Animated copper aiming trajectory preview dots.
           const rad = (previewAngle * Math.PI) / 180;
           const speed = 390;
           const vx = Math.cos(rad) * speed * facing;
           const vy = -Math.sin(rad) * speed;
-          ctx.fillStyle = "rgba(251, 191, 36, 0.75)";
+          ctx.fillStyle = "#EB9C5C";
           for (let step = 1; step <= 6; step++) {
             const t = step * 0.065;
             const dotX = fighterX + facing * 18 + vx * t;
@@ -185,16 +178,16 @@ export function CreaturePreviewPanel({
   }, [loadout, displayName, facing, previewAngle]);
 
   return (
-    <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/85 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-          Vista Ensamblada en Vivo
+    <div className="space-y-3 border border-[#2B2D38] bg-[#15151A] p-3">
+      <div className="flex items-center justify-between gap-2 font-mono">
+        <span className="text-[11px] font-bold tracking-wider text-[#52FF2E] uppercase">
+          FIG_LAB · Vista en Vivo
         </span>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setFacing((prev) => (prev === 1 ? -1 : 1))}
-            className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold text-slate-200 hover:border-emerald-400"
+            className="border border-[#3A3D4A] bg-[#1B1C22] px-2 py-1 text-[10px] font-bold text-[#ECEAE4] hover:border-[#52FF2E]"
           >
             Voltear
           </button>
@@ -203,7 +196,7 @@ export function CreaturePreviewPanel({
             onClick={() =>
               setPreviewAngle((prev) => (prev >= 70 ? 25 : prev + 15))
             }
-            className="rounded-lg border border-slate-700 px-2 py-1 text-[10px] font-bold text-slate-200 hover:border-sky-400"
+            className="border border-[#3A3D4A] bg-[#1B1C22] px-2 py-1 text-[10px] font-bold text-[#EB9C5C] hover:border-[#D47E3F]"
           >
             Mira {previewAngle}°
           </button>
@@ -214,18 +207,18 @@ export function CreaturePreviewPanel({
         ref={labCanvasRef}
         width={340}
         height={210}
-        className="w-full rounded-lg border border-slate-800"
+        className="w-full border border-[#2B2D38]"
       />
 
       <div>
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-sky-300">
-          Asi se vera en el Juego (Arena 2D)
+        <div className="mb-1 font-mono text-[10px] font-bold tracking-wider text-[#D47E3F] uppercase">
+          Simulación Arena 2D
         </div>
         <canvas
           ref={gameCanvasRef}
           width={340}
           height={136}
-          className="w-full rounded-lg border border-slate-800"
+          className="w-full border border-[#2B2D38]"
         />
       </div>
     </div>

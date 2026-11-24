@@ -3,7 +3,7 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:06:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 22:26:00
+// @Last Modified time: 2026-11-23 23:38:00
 
 /**
  * Multiplayer room lobby (up to 4 players with customizable teams and exclusive
@@ -647,13 +647,13 @@ export default function ArenaRoomPage() {
 
   if (errorMessage) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-sm text-rose-300">{errorMessage}</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#141418] p-6 text-center">
+        <p className="font-mono text-sm text-[#E84A5F]">{errorMessage}</p>
         <Link
           href="/menu"
-          className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950"
+          className="bg-[#52FF2E] px-4 py-2 font-mono text-xs font-bold text-[#121216] uppercase"
         >
-          Volver al Menu
+          Volver al Menú
         </Link>
       </main>
     );
@@ -661,7 +661,7 @@ export default function ArenaRoomPage() {
 
   if (!playerState || !room) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 text-sm text-slate-300">
+      <main className="flex min-h-screen items-center justify-center bg-[#141418] p-6 font-mono text-xs text-[#B0AEA6]">
         Conectando a la sala {roomCode}...
       </main>
     );
@@ -679,7 +679,7 @@ export default function ArenaRoomPage() {
       lobbyState.assignments[playerState.profile.id] ?? "team1";
 
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-[#141418]">
         <Navbar
           displayName={playerState.profile.displayName}
           coins={playerState.profile.coins}
@@ -687,106 +687,112 @@ export default function ArenaRoomPage() {
         />
 
         <main className="mx-auto max-w-6xl px-4 py-8">
-          <section className="rounded-2xl border border-emerald-500/40 bg-slate-900/90 p-6 shadow-2xl">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+          <section className="bg-[#16161B]">
+            <div className="sheet-rule-h" />
+
+            <div className="sheet-cell-edge-b flex flex-wrap items-center justify-between gap-4 p-6">
               <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-emerald-300">
-                  {isHost
-                    ? "Eres el Host (Servidor de la Partida)"
-                    : "Conectado como Invitado"}
-                </span>
-                <h1 className="mt-1 text-2xl font-black text-white">
+                <h1 className="text-2xl font-bold text-[#ECEAE4] sm:text-3xl">
                   Sala por Equipos · {startValidation.modeLabel}
                 </h1>
+                <p className="mt-1 font-mono text-xs text-[#52FF2E]">
+                  {isHost
+                    ? "ROL: HOST AUTORITATIVO (SERVIDOR)"
+                    : "ROL: JUGADOR INVITADO"}
+                </p>
               </div>
 
-              <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5">
+              <div className="blueprint-dots flex items-center gap-4 border border-[#D47E3F]/50 px-4 py-2.5">
                 <div>
-                  <div className="text-[10px] font-bold uppercase text-slate-400">
-                    Codigo de Sala (Max 4)
+                  <div className="font-mono text-[10px] font-bold text-[#8E8D86] uppercase">
+                    Código de Sala (Máx 4)
                   </div>
-                  <div className="font-mono text-2xl font-black tracking-widest text-emerald-300">
+                  <div className="font-mono text-2xl font-bold tracking-widest text-[#EB9C5C]">
                     {room.code}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleCopyCode}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-200 hover:border-emerald-400"
+                  className="border border-[#3A3D4A] bg-[#1B1C22] px-3 py-1.5 font-mono text-xs font-bold text-[#ECEAE4] uppercase hover:border-[#52FF2E] hover:text-[#52FF2E]"
                 >
                   {copiedCode ? "Copiado" : "Copiar"}
                 </button>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              <TeamLobbyCard
-                team={lobbyState.teams.team1}
-                otherTeamColor={lobbyState.teams.team2.colorKey}
-                members={team1Members}
-                isMember={myTeamId === "team1"}
-                canEdit={isHost || myTeamId === "team1"}
-                canJoin={myTeamId !== "team1" && team1Members.length < 2}
-                onJoin={() =>
-                  dispatchLobbyAction({
-                    type: "switch_team",
-                    playerId: playerState.profile.id,
-                    targetTeam: "team1",
-                  })
-                }
-                onColorChange={(colorKey) =>
-                  dispatchLobbyAction({
-                    type: "set_team_color",
-                    teamId: "team1",
-                    colorKey,
-                  })
-                }
-                onNameChange={(name) =>
-                  dispatchLobbyAction({
-                    type: "set_team_name",
-                    teamId: "team1",
-                    name,
-                  })
-                }
-              />
+            <div className="grid grid-cols-1 lg:grid-cols-2">
+              <div className="sheet-cell-edge-b sheet-cell-edge-r p-6">
+                <TeamLobbyCard
+                  team={lobbyState.teams.team1}
+                  otherTeamColor={lobbyState.teams.team2.colorKey}
+                  members={team1Members}
+                  isMember={myTeamId === "team1"}
+                  canEdit={isHost || myTeamId === "team1"}
+                  canJoin={myTeamId !== "team1" && team1Members.length < 2}
+                  onJoin={() =>
+                    dispatchLobbyAction({
+                      type: "switch_team",
+                      playerId: playerState.profile.id,
+                      targetTeam: "team1",
+                    })
+                  }
+                  onColorChange={(colorKey) =>
+                    dispatchLobbyAction({
+                      type: "set_team_color",
+                      teamId: "team1",
+                      colorKey,
+                    })
+                  }
+                  onNameChange={(name) =>
+                    dispatchLobbyAction({
+                      type: "set_team_name",
+                      teamId: "team1",
+                      name,
+                    })
+                  }
+                />
+              </div>
 
-              <TeamLobbyCard
-                team={lobbyState.teams.team2}
-                otherTeamColor={lobbyState.teams.team1.colorKey}
-                members={team2Members}
-                isMember={myTeamId === "team2"}
-                canEdit={isHost || myTeamId === "team2"}
-                canJoin={myTeamId !== "team2" && team2Members.length < 2}
-                onJoin={() =>
-                  dispatchLobbyAction({
-                    type: "switch_team",
-                    playerId: playerState.profile.id,
-                    targetTeam: "team2",
-                  })
-                }
-                onColorChange={(colorKey) =>
-                  dispatchLobbyAction({
-                    type: "set_team_color",
-                    teamId: "team2",
-                    colorKey,
-                  })
-                }
-                onNameChange={(name) =>
-                  dispatchLobbyAction({
-                    type: "set_team_name",
-                    teamId: "team2",
-                    name,
-                  })
-                }
-              />
+              <div className="sheet-cell-edge-b p-6">
+                <TeamLobbyCard
+                  team={lobbyState.teams.team2}
+                  otherTeamColor={lobbyState.teams.team1.colorKey}
+                  members={team2Members}
+                  isMember={myTeamId === "team2"}
+                  canEdit={isHost || myTeamId === "team2"}
+                  canJoin={myTeamId !== "team2" && team2Members.length < 2}
+                  onJoin={() =>
+                    dispatchLobbyAction({
+                      type: "switch_team",
+                      playerId: playerState.profile.id,
+                      targetTeam: "team2",
+                    })
+                  }
+                  onColorChange={(colorKey) =>
+                    dispatchLobbyAction({
+                      type: "set_team_color",
+                      teamId: "team2",
+                      colorKey,
+                    })
+                  }
+                  onNameChange={(name) =>
+                    dispatchLobbyAction({
+                      type: "set_team_name",
+                      teamId: "team2",
+                      name,
+                    })
+                  }
+                />
+              </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 pt-5">
+            <div className="sheet-cell-edge-b flex flex-wrap items-center justify-between gap-4 p-6">
               <div className="space-y-0.5">
-                <p className="text-sm font-semibold text-white">
+                <p className="font-mono text-sm font-bold text-[#ECEAE4]">
                   {startValidation.reason}
                 </p>
-                <p className="text-xs text-slate-400">
+                <p className="font-mono text-xs text-[#8E8D86]">
                   2 jugadores = 1 vs 1 · 3 jugadores = espera al 4.º · 4 jugadores = 2 vs 2
                 </p>
               </div>
@@ -796,7 +802,7 @@ export default function ArenaRoomPage() {
                   type="button"
                   disabled={!startValidation.canStart}
                   onClick={handleStartMatch}
-                  className="rounded-xl bg-emerald-500 px-6 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="bg-[#52FF2E] px-6 py-3 font-mono text-xs font-bold tracking-widest text-[#121216] uppercase transition hover:bg-[#32C81E] disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   Iniciar Combate (Pantalla Completa)
                 </button>
@@ -823,11 +829,11 @@ export default function ArenaRoomPage() {
     ? snapshot.teams[snapshot.winnerTeamId]
     : null;
 
-  // Fullscreen 100vw x 100vh Immersive Game View
+  // Fullscreen 100vw x 100vh Immersive Game View (palette adapted, layout preserved)
   return (
     <div
       ref={arenaShellRef}
-      className="fixed inset-0 z-50 h-screen w-screen overflow-hidden bg-slate-950 select-none"
+      className="fixed inset-0 z-50 h-screen w-screen overflow-hidden bg-[#121318] select-none"
     >
       <ArenaCanvas
         snapshot={snapshot}
@@ -839,7 +845,7 @@ export default function ArenaRoomPage() {
 
       {/* Top Floating Team HUD */}
       <header className="pointer-events-none absolute top-3 right-3 left-3 z-20 flex flex-wrap items-start justify-between gap-3">
-        <div className="pointer-events-auto flex flex-1 items-center gap-3 rounded-2xl border border-slate-700/70 bg-slate-950/85 px-4 py-2.5 shadow-xl backdrop-blur md:max-w-3xl">
+        <div className="pointer-events-auto flex flex-1 items-center gap-3 border border-[#D47E3F]/35 bg-[#15151A]/90 px-4 py-2.5 shadow-xl backdrop-blur md:max-w-3xl">
           <div className="flex-1">
             <TeamHudCard
               team={snapshot.teams.team1}
@@ -851,12 +857,12 @@ export default function ArenaRoomPage() {
 
           <div className="px-2 text-center">
             <div
-              className={`inline-block rounded-full px-3 py-0.5 text-[11px] font-black tracking-wider ${
+              className={`inline-block px-3 py-0.5 font-mono text-[11px] font-bold tracking-wider ${
                 snapshot.phase === "finished"
-                  ? "bg-amber-400/20 text-amber-200"
+                  ? "bg-[#D47E3F]/25 text-[#EB9C5C]"
                   : isMyTurn
-                    ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/50"
-                    : "bg-slate-800 text-slate-300"
+                    ? "bg-[#52FF2E]/20 text-[#52FF2E] ring-1 ring-[#52FF2E]/60"
+                    : "bg-[#22242C] text-[#B0AEA6]"
               }`}
             >
               {snapshot.phase === "finished"
@@ -865,10 +871,10 @@ export default function ArenaRoomPage() {
                   ? "TU TURNO"
                   : `TURNO: ${activeFighter?.displayName ?? "RIVAL"}`}
             </div>
-            <div className="mt-0.5 font-mono text-xl font-black text-white">
+            <div className="mt-0.5 font-mono text-xl font-bold text-[#ECEAE4] tabular-nums">
               {Math.ceil(snapshot.turnSecondsLeft)}s
             </div>
-            <div className="text-[10px] text-slate-400">
+            <div className="font-mono text-[10px] text-[#8E8D86]">
               T#{snapshot.turnNumber} · {room.code}
             </div>
           </div>
@@ -884,11 +890,11 @@ export default function ArenaRoomPage() {
         </div>
 
         {/* Utility Floating Buttons */}
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-slate-700/70 bg-slate-950/85 p-1.5 shadow-xl backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-1.5 border border-[#D47E3F]/35 bg-[#15151A]/90 p-1.5 shadow-xl backdrop-blur">
           <button
             type="button"
             onClick={() => setResetViewNonce((n) => n + 1)}
-            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-800"
+            className="px-2.5 py-1.5 font-mono text-xs font-bold text-[#ECEAE4] hover:bg-[#22242C]"
             title="Centrar camara y restablecer zoom al 100%"
           >
             Centrar
@@ -896,20 +902,20 @@ export default function ArenaRoomPage() {
           <button
             type="button"
             onClick={() => setMuted(soundEngine.toggleMute())}
-            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-800"
+            className="px-2.5 py-1.5 font-mono text-xs font-bold text-[#B0AEA6] hover:bg-[#22242C]"
           >
             {muted ? "Audio: OFF" : "Audio: ON"}
           </button>
           <button
             type="button"
             onClick={toggleBrowserFullscreen}
-            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-emerald-300 hover:bg-slate-800"
+            className="px-2.5 py-1.5 font-mono text-xs font-bold text-[#52FF2E] hover:bg-[#22242C]"
           >
             {isFullscreen ? "Ventana" : "Pantalla Completa"}
           </button>
           <Link
             href="/menu"
-            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/20"
+            className="px-2.5 py-1.5 font-mono text-xs font-bold text-[#E84A5F] hover:bg-[#E84A5F]/15"
           >
             Salir
           </Link>
@@ -919,13 +925,13 @@ export default function ArenaRoomPage() {
       {/* Bottom Floating Tactical Controls (including Shift Jump) */}
       {snapshot.phase !== "finished" && myFighter && (
         <footer className="pointer-events-none absolute right-3 bottom-3 left-3 z-20 flex justify-center">
-          <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2.5 rounded-2xl border border-slate-700/75 bg-slate-950/85 px-4 py-2.5 shadow-2xl backdrop-blur">
+          <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2.5 border border-[#D47E3F]/40 bg-[#15151A]/90 px-4 py-2.5 shadow-2xl backdrop-blur">
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 disabled={!isMyTurn}
                 onClick={() => sendCommand({ type: "move", direction: -1 })}
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:border-emerald-400 disabled:opacity-40"
+                className="border border-[#3A3D4A] bg-[#1B1C22] px-3 py-2 font-mono text-xs font-bold text-[#ECEAE4] hover:border-[#52FF2E] disabled:opacity-40"
               >
                 ← A
               </button>
@@ -933,7 +939,7 @@ export default function ArenaRoomPage() {
                 type="button"
                 disabled={!isMyTurn}
                 onClick={() => sendCommand({ type: "move", direction: 1 })}
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:border-emerald-400 disabled:opacity-40"
+                className="border border-[#3A3D4A] bg-[#1B1C22] px-3 py-2 font-mono text-xs font-bold text-[#ECEAE4] hover:border-[#52FF2E] disabled:opacity-40"
               >
                 D →
               </button>
@@ -941,7 +947,7 @@ export default function ArenaRoomPage() {
                 type="button"
                 disabled={!isMyTurn || !myFighter.grounded}
                 onClick={() => sendCommand({ type: "jump" })}
-                className="rounded-xl border border-violet-400/50 bg-violet-500/20 px-3 py-2 text-xs font-bold text-violet-200 hover:bg-violet-500/30 disabled:opacity-40"
+                className="border border-[#D47E3F]/60 bg-[#D47E3F]/20 px-3 py-2 font-mono text-xs font-bold text-[#EB9C5C] hover:bg-[#D47E3F]/30 disabled:opacity-40"
               >
                 Saltar (SHIFT)
               </button>
@@ -954,7 +960,7 @@ export default function ArenaRoomPage() {
                     angleDeg: myFighter.aimAngleDeg + 5,
                   })
                 }
-                className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs font-bold text-white hover:border-sky-400 disabled:opacity-40"
+                className="border border-[#3A3D4A] bg-[#1B1C22] px-2.5 py-2 font-mono text-xs font-bold text-[#ECEAE4] hover:border-[#D47E3F] disabled:opacity-40"
               >
                 ↑ W
               </button>
@@ -967,7 +973,7 @@ export default function ArenaRoomPage() {
                     angleDeg: myFighter.aimAngleDeg - 5,
                   })
                 }
-                className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs font-bold text-white hover:border-sky-400 disabled:opacity-40"
+                className="border border-[#3A3D4A] bg-[#1B1C22] px-2.5 py-2 font-mono text-xs font-bold text-[#ECEAE4] hover:border-[#D47E3F] disabled:opacity-40"
               >
                 ↓ S
               </button>
@@ -979,9 +985,9 @@ export default function ArenaRoomPage() {
             />
 
             <div className="flex items-center gap-2.5">
-              <div className="text-[11px] text-slate-300">
+              <div className="font-mono text-[11px] text-[#B0AEA6] tabular-nums">
                 Energia:{" "}
-                <strong className="text-violet-300">
+                <strong className="text-[#52FF2E]">
                   {myFighter.moveEnergyLeft}
                 </strong>
               </div>
@@ -993,7 +999,7 @@ export default function ArenaRoomPage() {
                 onMouseLeave={releaseFire}
                 onTouchStart={beginCharge}
                 onTouchEnd={releaseFire}
-                className="rounded-xl bg-amber-400 px-5 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-amber-400/20 transition hover:bg-amber-300 disabled:opacity-40"
+                className="bg-[#D47E3F] px-5 py-2.5 font-mono text-xs font-bold text-[#121216] uppercase shadow-lg transition hover:bg-[#EB9C5C] disabled:opacity-40"
               >
                 Mantener: Disparar (ESPACIO)
               </button>
@@ -1004,13 +1010,13 @@ export default function ArenaRoomPage() {
 
       {/* Team Victory Overlay */}
       {snapshot.phase === "finished" && winningTeamConfig && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#121216]/80 p-4 backdrop-blur-sm">
           <div
-            className="max-w-md rounded-2xl border-2 bg-slate-900 p-7 text-center shadow-2xl"
+            className="max-w-md border-2 bg-[#15151A] p-7 text-center shadow-2xl"
             style={{ borderColor: winningTeamConfig.hex }}
           >
             <div
-              className="text-xs font-black uppercase tracking-widest"
+              className="font-mono text-xs font-bold tracking-widest uppercase"
               style={{ color: winningTeamConfig.hex }}
             >
               {myFighter?.teamId === snapshot.winnerTeamId
@@ -1018,28 +1024,28 @@ export default function ArenaRoomPage() {
                 : "Equipo Ganador"}
             </div>
             <h2
-              className="mt-1 text-3xl font-black"
+              className="mt-1 text-3xl font-bold"
               style={{ color: winningTeamConfig.hex }}
             >
               {winningTeamConfig.name}
             </h2>
             {rewardMessage && (
-              <p className="mt-2 text-sm font-semibold text-emerald-300">
+              <p className="mt-2 font-mono text-xs font-bold text-[#52FF2E]">
                 {rewardMessage}
               </p>
             )}
             <div className="mt-6 flex justify-center gap-3">
               <Link
                 href="/gacha"
-                className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-black text-slate-950 hover:bg-amber-300"
+                className="bg-[#D47E3F] px-5 py-2.5 font-mono text-xs font-bold text-[#121216] uppercase hover:bg-[#EB9C5C]"
               >
                 Abrir Sobres TCG
               </Link>
               <Link
                 href="/menu"
-                className="rounded-xl border border-slate-700 px-5 py-2.5 text-sm font-bold text-white hover:border-emerald-400"
+                className="border border-[#3A3D4A] px-5 py-2.5 font-mono text-xs font-bold text-[#ECEAE4] uppercase hover:border-[#52FF2E]"
               >
-                Volver al Menu
+                Volver al Menú
               </Link>
             </div>
           </div>
@@ -1074,13 +1080,13 @@ function TeamLobbyCard({
 }: TeamLobbyCardProps) {
   return (
     <div
-      className="space-y-4 rounded-2xl border-2 bg-slate-950/80 p-4"
+      className="space-y-4 border bg-[#15151A] p-4"
       style={{ borderColor: `${team.hex}88` }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-1 items-center gap-2">
           <span
-            className="h-3.5 w-3.5 shrink-0 rounded-full"
+            className="h-3.5 w-3.5 shrink-0"
             style={{ backgroundColor: team.hex }}
           />
           <input
@@ -1090,18 +1096,18 @@ function TeamLobbyCard({
             value={team.name}
             onChange={(e) => onNameChange(e.target.value)}
             aria-label={`Nombre del ${team.name}`}
-            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-sm font-black text-white outline-none focus:border-white disabled:opacity-75"
+            className="w-full border border-[#2E313D] bg-[#141418] px-2.5 py-1 font-display text-sm font-bold text-[#ECEAE4] outline-none focus:border-[#52FF2E] disabled:opacity-75"
           />
         </div>
 
-        <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-slate-200">
+        <span className="border border-[#3A3D4A] bg-[#1B1C22] px-2.5 py-0.5 font-mono text-[11px] font-bold text-[#ECEAE4] tabular-nums">
           {members.length}/2
         </span>
       </div>
 
       {/* Exclusive color selector */}
       <div className="space-y-1.5">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="font-mono text-[10px] font-bold tracking-wider text-[#8E8D86] uppercase">
           Color del Equipo (Exclusivo)
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1115,16 +1121,16 @@ function TeamLobbyCard({
                 disabled={!canEdit || takenByOther}
                 onClick={() => onColorChange(option.key)}
                 title={takenByOther ? "En uso por el otro equipo" : option.label}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                className={`flex items-center gap-1.5 border px-2.5 py-1 font-mono text-[11px] font-bold transition ${
                   isSelected
-                    ? "border-white bg-slate-800 text-white"
+                    ? "border-[#ECEAE4] bg-[#22242C] text-[#ECEAE4]"
                     : takenByOther
-                      ? "cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-600 line-through"
-                      : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
+                      ? "cursor-not-allowed border-[#252731] bg-[#141418] text-[#5C5E6B] line-through"
+                      : "border-[#2E313D] bg-[#141418] text-[#B0AEA6] hover:border-[#D47E3F]"
                 }`}
               >
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
+                  className="h-2.5 w-2.5"
                   style={{ backgroundColor: option.hex }}
                 />
                 {option.label}
@@ -1142,7 +1148,7 @@ function TeamLobbyCard({
             return (
               <div
                 key={slotIdx}
-                className="flex h-24 items-center justify-center rounded-xl border border-dashed border-slate-800 text-xs text-slate-500"
+                className="flex h-24 items-center justify-center border border-dashed border-[#2E313D] font-mono text-xs text-[#8E8D86]"
               >
                 Espacio libre ({slotIdx === 0 ? "1v1 / 2v2" : "2v2"})
               </div>
@@ -1152,21 +1158,21 @@ function TeamLobbyCard({
           return (
             <div
               key={member.playerId}
-              className="flex items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-900/90 p-2"
+              className="flex items-center gap-2.5 border border-[#2E313D] bg-[#1B1C22] p-2"
             >
               <LobbyCreaturePreview
                 appearance={member.appearance}
                 teamColor={team.hex}
                 facing={team.id === "team1" ? 1 : -1}
               />
-              <div className="min-w-0">
-                <div className="truncate text-xs font-black text-white">
+              <div className="min-w-0 font-mono tabular-nums">
+                <div className="truncate font-display text-xs font-bold text-[#ECEAE4]">
                   {member.displayName}
                 </div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-[#B0AEA6]">
                   HP {member.stats.maxHp} · ATK {member.stats.attack}
                 </div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-[#8E8D86]">
                   DEF {member.stats.defense} · MOV {member.stats.mobility}
                 </div>
               </div>
@@ -1177,15 +1183,15 @@ function TeamLobbyCard({
 
       <div className="flex justify-end">
         {isMember ? (
-          <span className="text-[11px] font-bold text-emerald-300">
-            Estas en este equipo
+          <span className="font-mono text-[11px] font-bold text-[#52FF2E] uppercase">
+            Estás en este equipo
           </span>
         ) : (
           <button
             type="button"
             disabled={!canJoin}
             onClick={onJoin}
-            className="rounded-xl border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-bold text-white hover:border-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="border border-[#D47E3F] bg-[#1B1C22] px-3 py-1.5 font-mono text-xs font-bold text-[#EB9C5C] uppercase hover:bg-[#D47E3F]/15 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {members.length >= 2 ? "Equipo lleno" : "Unirme a este equipo"}
           </button>
@@ -1254,32 +1260,32 @@ function TeamHudCard({
   return (
     <div className={align === "right" ? "text-right" : "text-left"}>
       <div
-        className="truncate text-xs font-black sm:text-sm"
+        className="truncate font-display text-xs font-bold sm:text-sm"
         style={{ color: team.hex }}
       >
         {team.name}{" "}
-        <span className="text-[11px] font-semibold text-slate-300">
+        <span className="font-mono text-[11px] font-semibold text-[#B0AEA6] tabular-nums">
           ({totalHp}/{totalMaxHp})
         </span>
       </div>
-      <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-slate-800">
+      <div className="mt-1 h-2.5 overflow-hidden bg-[#22242C]">
         <div
           className="h-full transition-all"
           style={{ width: `${pct}%`, backgroundColor: team.hex }}
         />
       </div>
       <div
-        className={`mt-1 flex flex-wrap gap-1.5 text-[10px] ${
+        className={`mt-1 flex flex-wrap gap-1.5 font-mono text-[10px] tabular-nums ${
           align === "right" ? "justify-end" : "justify-start"
         }`}
       >
         {fighters.map((fighter) => (
           <span
             key={fighter.playerId}
-            className={`rounded px-1.5 py-0.5 font-semibold ${
+            className={`px-1.5 py-0.5 font-bold ${
               fighter.playerId === activePlayerId
-                ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/50"
-                : "bg-slate-900 text-slate-300"
+                ? "bg-[#D47E3F]/25 text-[#EB9C5C] ring-1 ring-[#D47E3F]/60"
+                : "bg-[#1B1C22] text-[#B0AEA6]"
             }`}
           >
             {fighter.displayName}: {fighter.hp}

@@ -3,24 +3,26 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:03:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 21:03:00
+// @Last Modified time: 2026-11-23 23:36:00
 
 /**
- * Main menu hub after authentication: create/join multiplayer lobbies,
- * open Gacha TCG packs, or customize the creature in Victor's Lab.
+ * Main command hub after authentication: create/join multiplayer lobbies,
+ * launch Gacha TCG pack openings, inspect assembled creature, and explore
+ * the 5-column technical blueprint architecture sheet.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { BlueprintSheetSection } from "@/components/blueprint/BlueprintSheetSection";
 import { Navbar } from "@/components/layout/Navbar";
 import { PartArtwork } from "@/components/parts/PartArtwork";
+import type { Loadout } from "@/domain/types";
 import {
   buildAppearanceFromLoadout,
   drawAssembledCreature,
 } from "@/engine/creatureRenderer";
-import type { Loadout } from "@/domain/types";
 import type { PlayerFullState } from "@/infrastructure/supabase/partsRepository";
 
 export default function MenuPage() {
@@ -79,7 +81,7 @@ export default function MenuPage() {
     event.preventDefault();
     const cleanCode = joinCode.trim().toUpperCase();
     if (cleanCode.length !== 6) {
-      setRoomError("Introduce un codigo valido de 6 caracteres.");
+      setRoomError("Introduce un código válido de 6 caracteres.");
       return;
     }
 
@@ -105,7 +107,7 @@ export default function MenuPage() {
 
   if (loading || !state) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6 text-sm text-slate-300">
+      <main className="flex min-h-screen items-center justify-center bg-[#141418] p-6 font-mono text-xs text-[#B0AEA6]">
         {roomError ?? "Cargando tu laboratorio desde Supabase..."}
       </main>
     );
@@ -119,174 +121,186 @@ export default function MenuPage() {
   ];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#141418]">
       <Navbar
         displayName={state.profile.displayName}
         coins={state.profile.coins}
         freePacks={state.profile.freePacks}
       />
 
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Play / Multiplayer Host-Server Lobby Card */}
-          <section className="flex flex-col justify-between rounded-2xl border border-emerald-500/40 bg-slate-900/90 p-6 shadow-xl lg:col-span-2">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-300">
-                Combate 2D Multijugador (Host-Servidor)
-              </span>
-              <h1 className="mt-1 text-2xl font-black text-white">
-                Jugar Partida de Artilleria (Hasta 4 Jugadores)
-              </h1>
-              <p className="mt-1.5 text-sm text-slate-300">
-                Quien crea la sala es el servidor de la partida y comparte un
-                codigo de 6 caracteres. Juega 1 vs 1 con 2 jugadores o 2 vs 2
-                por equipos personalizables con 4 jugadores.
-              </p>
-            </div>
+      <main className="mx-auto max-w-6xl space-y-10 px-4 py-8">
+        {/* Top Command Sheet */}
+        <section className="bg-[#16161B]">
+          <div className="sheet-rule-h" />
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-4">
-                <h2 className="text-sm font-bold text-white">Crear nueva sala</h2>
-                <p className="mt-1 text-xs text-slate-400">
-                  Genera un codigo unico y controla la fisica y turnos como Host.
+          <div className="grid grid-cols-1 lg:grid-cols-5">
+            {/* Left 3 cols: Multiplayer Host & Join Controls */}
+            <div className="sheet-cell-edge-b sheet-cell-edge-r flex flex-col justify-between p-6 sm:p-8 lg:col-span-3">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-[#ECEAE4] sm:text-4xl">
+                  Partida de Artillería Multijugador
+                </h1>
+                <p className="mt-2.5 max-w-[54ch] text-sm leading-relaxed text-[#B0AEA6]">
+                  Quien crea la sala actúa como servidor autoritativo y comparte
+                  un código de 6 caracteres. Juega 1 vs 1 o arma equipos
+                  personalizables 2 vs 2.
                 </p>
-                <button
-                  type="button"
-                  disabled={busyRoom}
-                  onClick={handleCreateRoom}
-                  className="mt-4 w-full rounded-xl bg-emerald-500 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"
-                >
-                  {busyRoom ? "Preparando sala..." : "Crear Sala (Ser Host)"}
-                </button>
               </div>
 
-              <form
-                onSubmit={handleJoinRoom}
-                className="rounded-xl border border-slate-800 bg-slate-950/80 p-4"
-              >
-                <h2 className="text-sm font-bold text-white">
-                  Unirme con codigo
-                </h2>
-                <p className="mt-1 text-xs text-slate-400">
-                  Pide el codigo de 6 caracteres al anfitrion de la partida.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                    placeholder="EJ. FRNK42"
-                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-center font-mono text-sm font-bold tracking-widest text-white uppercase outline-none focus:border-sky-400"
-                  />
+              <div className="mt-8 grid gap-6 border-t border-[#2B2D38] pt-6 sm:grid-cols-2">
+                <div className="flex flex-col justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-[#ECEAE4]">
+                      Crear nueva sala
+                    </h2>
+                    <p className="mt-1 font-mono text-xs text-[#8E8D86]">
+                      Genera un código único y controla física y turnos como Host.
+                    </p>
+                  </div>
                   <button
-                    type="submit"
+                    type="button"
                     disabled={busyRoom}
-                    className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-sky-400 disabled:opacity-60"
+                    onClick={handleCreateRoom}
+                    className="mt-4 w-full bg-[#52FF2E] py-3 font-mono text-xs font-bold tracking-widest text-[#121216] uppercase transition hover:bg-[#32C81E] disabled:opacity-60"
                   >
-                    Entrar
+                    {busyRoom ? "Preparando sala..." : "Crear Sala (Ser Host)"}
                   </button>
                 </div>
-              </form>
+
+                <form
+                  onSubmit={handleJoinRoom}
+                  className="flex flex-col justify-between"
+                >
+                  <div>
+                    <h2 className="text-base font-bold text-[#ECEAE4]">
+                      Unirme con código
+                    </h2>
+                    <p className="mt-1 font-mono text-xs text-[#8E8D86]">
+                      Introduce el código de 6 caracteres del anfitrión.
+                    </p>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={joinCode}
+                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                      placeholder="FRNK42"
+                      className="w-full border border-[#2E313D] bg-[#141418] px-3 py-2.5 text-center font-mono text-sm font-bold tracking-widest text-[#ECEAE4] uppercase outline-none focus:border-[#D47E3F]"
+                    />
+                    <button
+                      type="submit"
+                      disabled={busyRoom}
+                      className="bg-[#D47E3F] px-5 py-2.5 font-mono text-xs font-bold tracking-wider text-[#121216] uppercase transition hover:bg-[#EB9C5C] disabled:opacity-60"
+                    >
+                      Entrar
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {roomError && (
+                <div className="mt-4 border border-[#E84A5F]/60 bg-[#E84A5F]/15 px-3 py-2 font-mono text-xs text-[#ECEAE4]">
+                  {roomError}
+                </div>
+              )}
             </div>
 
-            {roomError && (
-              <div className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-                {roomError}
-              </div>
-            )}
-          </section>
+            {/* Right 2 cols: Stacked Gacha + Lab Navigation Cells */}
+            <div className="grid grid-rows-2 lg:col-span-2">
+              <Link
+                href="/gacha"
+                className="sheet-cell-edge-b group flex flex-col justify-between bg-[#15151A] p-6 transition hover:bg-[#1B1C22]"
+              >
+                <div className="flex items-center justify-between font-mono text-xs">
+                  <span className="font-bold text-[#D47E3F]">GACHA TCG</span>
+                  <span className="border border-[#D47E3F]/50 bg-[#D47E3F]/15 px-2 py-0.5 font-bold text-[#EB9C5C] tabular-nums">
+                    {state.profile.freePacks} SOBRES GRATIS
+                  </span>
+                </div>
+                <div>
+                  <h2 className="mt-3 text-xl font-bold text-[#ECEAE4] group-hover:text-[#EB9C5C]">
+                    Abrir Sobres de Cartas
+                  </h2>
+                  <p className="mt-1 font-mono text-xs text-[#B0AEA6]">
+                    Desgarra sobres isométricos y obtén piezas Normales, Raras y
+                    Únicas.
+                  </p>
+                </div>
+              </Link>
 
-          {/* Gacha & Lab quick pillars */}
-          <section className="flex flex-col gap-4">
-            <Link
-              href="/gacha"
-              className="group flex-1 rounded-2xl border border-amber-400/40 bg-gradient-to-br from-slate-900 to-amber-950/30 p-5 shadow-xl transition hover:border-amber-300"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-widest text-amber-300">
-                  Gacha estilo TCG
-                </span>
-                <span className="rounded-full bg-amber-400/20 px-2.5 py-0.5 text-xs font-bold text-amber-200">
-                  {state.profile.freePacks} sobres gratis
-                </span>
-              </div>
-              <h2 className="mt-2 text-xl font-black text-white group-hover:text-amber-200">
-                Abrir Sobres de Cartas
-              </h2>
-              <p className="mt-1 text-xs text-slate-300">
-                Consigue piezas Normales, Raras y Unicas. Las repetidas se
-                convierten en FrankenCoins.
-              </p>
-            </Link>
+              <Link
+                href="/lab"
+                className="sheet-cell-edge-b group flex flex-col justify-between bg-[#15151A] p-6 transition hover:bg-[#1B1C22]"
+              >
+                <div className="flex items-center justify-between font-mono text-xs">
+                  <span className="font-bold text-[#52FF2E]">LABORATORIO</span>
+                  <span className="border border-[#52FF2E]/50 bg-[#52FF2E]/15 px-2 py-0.5 font-bold text-[#52FF2E] tabular-nums">
+                    {state.inventory.length}/{state.catalog.length} PIEZAS
+                  </span>
+                </div>
+                <div>
+                  <h2 className="mt-3 text-xl font-bold text-[#ECEAE4] group-hover:text-[#52FF2E]">
+                    Personalizar Criatura
+                  </h2>
+                  <p className="mt-1 font-mono text-xs text-[#B0AEA6]">
+                    Combina cabeza, torso, brazos y piernas para calibrar HP,
+                    ATK, DEF y rasgos.
+                  </p>
+                </div>
+              </Link>
+            </div>
+          </div>
+        </section>
 
-            <Link
-              href="/lab"
-              className="group flex-1 rounded-2xl border border-sky-400/40 bg-gradient-to-br from-slate-900 to-sky-950/30 p-5 shadow-xl transition hover:border-sky-300"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-widest text-sky-300">
-                  Laboratorio de Victor
-                </span>
-                <span className="rounded-full bg-sky-400/20 px-2.5 py-0.5 text-xs font-bold text-sky-200">
-                  {state.inventory.length}/{state.catalog.length} piezas
-                </span>
-              </div>
-              <h2 className="mt-2 text-xl font-black text-white group-hover:text-sky-200">
-                Personalizar Criatura
-              </h2>
-              <p className="mt-1 text-xs text-slate-300">
-                Combina cabeza, torso, brazos y piernas para optimizar vida,
-                ataque, defensa y rasgos unicos.
-              </p>
-            </Link>
-          </section>
-        </div>
+        {/* Active Creature 5-Column Blueprint Strip */}
+        <section className="bg-[#16161B]">
+          <div className="sheet-rule-h" />
 
-        {/* Equipped creature overview */}
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="sheet-cell-edge-b flex flex-wrap items-center justify-between gap-4 px-6 py-4">
             <div>
-              <h2 className="text-lg font-bold text-white">
-                Tu Criatura Activa ({state.profile.displayName})
+              <h2 className="text-lg font-bold text-[#ECEAE4]">
+                Criatura Activa — {state.profile.displayName}
               </h2>
-              <p className="text-xs text-slate-400">
-                Base 100 HP · 20 ATK · 5 DEF · Dano estimado vs defensa base:{" "}
-                <strong className="text-emerald-300">
-                  {Math.max(1, state.stats.attack - 5)} dmg
+              <p className="font-mono text-xs text-[#8E8D86] tabular-nums">
+                Impacto directo vs DEF base (5):{" "}
+                <strong className="text-[#52FF2E]">
+                  {Math.max(1, state.stats.attack - 5)} DMG
                 </strong>
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs font-bold">
-              <span className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-emerald-300">
-                VIDA {state.stats.maxHp}
-              </span>
-              <span className="rounded-lg bg-rose-500/15 px-3 py-1.5 text-rose-300">
-                ATAQUE {state.stats.attack}
-              </span>
-              <span className="rounded-lg bg-sky-500/15 px-3 py-1.5 text-sky-300">
-                DEFENSA {state.stats.defense}
-              </span>
-              <span className="rounded-lg bg-violet-500/15 px-3 py-1.5 text-violet-300">
+
+            <div className="flex flex-wrap gap-4 font-mono text-xs font-bold tabular-nums">
+              <span className="text-[#52FF2E]">VIDA {state.stats.maxHp}</span>
+              <span className="text-[#EB9C5C]">ATAQUE {state.stats.attack}</span>
+              <span className="text-[#ECEAE4]">DEFENSA {state.stats.defense}</span>
+              <span className="text-[#B0AEA6]">
                 MOVILIDAD {state.stats.mobility}
               </span>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-slate-950/90 p-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="blueprint-dots sheet-cell-edge-b sheet-cell-edge-r flex flex-col items-center justify-between p-4">
+              <div className="flex w-full justify-between font-mono text-[10px] text-[#8E8D86]">
+                <span>SPECIMEN_00</span>
+                <span className="text-[#52FF2E]">ACTIVA</span>
+              </div>
               <MiniCreatureBadge
                 loadout={state.loadout}
                 displayName={state.profile.displayName}
               />
-              <span className="mt-1 text-[11px] font-bold text-emerald-300">
-                Criatura Ensamblada
+              <span className="font-mono text-[11px] font-bold text-[#ECEAE4]">
+                Ensamblaje en Vivo
               </span>
             </div>
-            {equippedParts.map((part) => (
+
+            {equippedParts.map((part, idx) => (
               <div
                 key={part.id}
-                className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"
+                className={`sheet-cell-edge-b p-4 ${
+                  idx < equippedParts.length - 1 ? "sheet-cell-edge-r" : ""
+                }`}
               >
                 <PartArtwork
                   imageUrl={part.assetUrl}
@@ -295,16 +309,19 @@ export default function MenuPage() {
                   rarity={part.rarity}
                   className="h-28 w-full"
                 />
-                <div className="mt-2 text-xs font-bold text-white">
+                <div className="mt-2.5 truncate font-display text-sm font-bold text-[#ECEAE4]">
                   {part.name}
                 </div>
-                <div className="text-[11px] text-slate-400 capitalize">
+                <div className="font-mono text-[11px] text-[#8E8D86] uppercase">
                   {part.slot} · {part.rarity}
                 </div>
               </div>
             ))}
           </div>
         </section>
+
+        {/* 5-Column Technical Design Blueprint Sheet (FIG_01..FIG_04) */}
+        <BlueprintSheetSection />
       </main>
     </div>
   );
@@ -343,7 +360,7 @@ function MiniCreatureBadge({
         facing: 1,
         aimAngleDeg: 38,
         appearance,
-        teamColor: "#34d399",
+        teamColor: "#52FF2E",
         scale: 1.55,
         timeSec: nowMs / 1000,
         isAlive: true,
