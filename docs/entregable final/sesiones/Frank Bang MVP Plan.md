@@ -67,11 +67,96 @@ El usuario propuso y validó guardar todos los visuales (PNG o SVG) en un bucket
 - `pnpm run lint`: **0 errores, 0 advertencias**.
 - `pnpm run build`: **Compilación de producción exitosa** (14/14 rutas generadas).
 
-## 6. Despliegue en Vivo en Supabase (`tgsoflrcoezgmoopnzdi`)
+## 6. Despliegue en Vivo en Supabase (`tgsoflrcoezgmoopnzdi`) y GitHub
 
+- **Repositorio GitHub creado y subido:** `https://github.com/ecojrsg/frank_and_bang` (commit inicial `f07d138` sobre rama `main`).
 - `supabase link --project-ref tgsoflrcoezgmoopnzdi --yes`: **OK** (proyecto `frank_and_bang` enlazado).
-- `supabase db push --yes`: **OK** (`20261123000001_init_frank_and_bang.sql` aplicada — 5 tablas, políticas RLS, bucket público `parts-assets` y 12 piezas seed).
-- `node --env-file=.env.local scripts/upload-part-assets.mjs`: **OK** (7/7 SVGs isométricos de `anatomy` subidos al bucket `parts-assets`).
+- `supabase db push --yes`: **OK** (`20261123000001_init_frank_and_bang.sql` y `20261123000002_head_torso_assets.sql` aplicadas).
+- `node --env-file=.env.local scripts/upload-part-assets.mjs`: **OK** (13/13 SVGs isométricos de `anatomy` subidos al bucket `parts-assets`: 12 piezas + `card_back.svg`).
 - Servidor de desarrollo `pnpm dev` levantado en `http://localhost:3000`.
+
+---
+
+## 7. Iteración 2 — Pantalla Completa, Cámara Dinámica, Criatura Ensamblada, Audio y Efectos `/anatomy`
+
+### Acuerdos (`/grill-me` + `/plan`)
+1. **Criatura ensamblada compartida:** Renderizador modular 2D (`src/engine/creatureRenderer.ts`) compartido entre Laboratorio (`/lab`), Menú (`/menu`), Lobby y Arena (`/arena/[code]`), con silueta/detalles propios para las 12 piezas y fallback por slot/rareza. Además se completaron los 6 SVGs isométricos faltantes de Cabezas y Torsos con `anatomy` (12/12 en `parts-assets`).
+2. **Pantalla completa y mapa grande:** Arena inmersiva `100vw × 100vh` (`fixed inset-0`), mundo destructible de **`2200 × 900`**, spawns separados (`x=396` vs `x=1804`), cámara cinematográfica (`src/domain/cameraEngine.ts`) que sigue al atacante y a la granada, tiembla en impactos (`impact_hold`), más arrastre libre con mouse y minimapa táctico interactivo.
+3. **Audio procedural y VFX `/anatomy`:** Sintetizador Web Audio API sin dependencias externas (`src/engine/soundEngine.ts`), partículas con envolventes de fuego/humo/chispas (`src/engine/vfxEngine.ts`) y dial isométrico vivo de ángulo/potencia (`src/components/arena/ArtilleryDialGauge.tsx`).
+
+### Archivos Creados / Actualizados en Iteración 2
+- `supabase/migrations/20261123000002_head_torso_assets.sql` y `scripts/generate-part-svgs.mjs` (13/13 SVGs).
+- `src/domain/cameraEngine.ts`, `src/domain/types.ts`, `src/domain/terrainEngine.ts`, `src/domain/combatEngine.ts`, `src/domain/physicsEngine.ts`, `src/domain/gameRoomHost.ts` y `tests/domain/domain.test.ts`.
+- `src/engine/creatureRenderer.ts`, `src/engine/soundEngine.ts`, `src/engine/vfxEngine.ts`, `src/engine/ArenaCanvas.tsx`.
+- `src/components/lab/CreaturePreviewPanel.tsx`, `src/components/arena/ArtilleryDialGauge.tsx`, `src/network/realtimeProtocol.ts`.
+- `src/app/lab/page.tsx`, `src/app/menu/page.tsx`, `src/app/gacha/page.tsx`, `src/app/arena/[code]/page.tsx`.
+- `docs/entregable final/02_arquitectura_y_diagramas.md` y `docs/entregable final/04_reporte_final.md`.
+
+### Resultados de Verificación — Iteración 2 (2026-11-23)
+- `node scripts/generate-part-svgs.mjs`: **OK** (13/13 SVGs generados en `assets/parts-assets/`).
+- `supabase db push --yes` + `upload-part-assets.mjs`: **OK** (12/12 filas con `asset_path` y 13/13 SVGs en bucket `parts-assets`, verificado HTTP `200`).
+- `pnpm test` (`vitest run`): **10/10 pruebas unitarias en verde** (incluye `cameraEngine`, mapa `2200×900` y `CreatureAppearance`).
+- `pnpm exec tsc --noEmit`: **0 errores**.
+- `pnpm run lint`: **0 errores, 0 advertencias**.
+- `pnpm run build`: **Compilación de producción exitosa** (14/14 rutas).
+
+---
+
+## 8. Iteración 3 — Salto (`Shift`), Salas hasta 4 Jugadores (1v1 / 2v2) y Equipos Personalizables
+
+### Requerimientos Implementados
+1. **Salto de Criaturas (`Shift` + botón en pantalla):**
+   - Comando `{ type: "jump" }` en `src/domain/gameRoomHost.ts` compatible tanto con teclado `WASD` como con flechas (`Shift` sin repetición al mantener presionado), con física de gravedad compartida (`vx`, `vy`, `grounded`), caída natural dentro de cráteres y sonido `playJump()`.
+2. **Multijugador hasta 4 Jugadores (1 vs 1 o 2 vs 2):**
+   - Migración `supabase/migrations/20261123000003_four_player_teams.sql` (`player_ids uuid[]`, `max_players = 4`, `winner_team_id`, índice GIN y políticas RLS actualizadas) aplicada a Supabase.
+   - Reglas en `src/domain/teamLobby.ts` (`validateMatchStart`): **2 jugadores** habilita 1 vs 1; **3 jugadores** bloquea el inicio y espera al 4.º jugador; **4 jugadores** habilita 2 vs 2 con turnos alternados por equipo (`T1-P1 → T2-P1 → T1-P2 → T2-P2`).
+3. **Equipos Personalizables con Colores Exclusivos:**
+   - En `/arena/[code]`, cada equipo puede editar su nombre y elegir su color (`Rojo`, `Azul`, `Verde`, `Dorado`, `Morado`, `Rosa`) con bloqueo mutuo (un color seleccionado por un equipo queda inhabilitado para el otro), reflejado en el lobby, los personajes del Canvas, el minimapa, el HUD superior y la pantalla de victoria.
+
+### Resultados de Verificación — Iteración 3 (2026-11-23)
+- `supabase db push --yes`: **OK** (`20261123000003_four_player_teams.sql` aplicada).
+- `pnpm test` (`vitest run`): **12/12 pruebas unitarias en verde** (incluye `teamLobby`, salto y turnos 2 vs 2).
+- `pnpm exec tsc --noEmit`: **0 errores**.
+- `pnpm run lint`: **0 errores, 0 advertencias**.
+- `pnpm run build`: **Compilación limpia (14/14 rutas)**.
+
+---
+
+## 9. Iteración 4 — Terreno/Spawns Aleatorios, Zoom Responsivo 2K Ultrawide y Mapa 4P Ampliado
+
+### Cambios Realizados
+1. **Generación Aleatoria y Mapa 4 Jugadores (`src/domain/terrainEngine.ts` + `gameRoomHost.ts`):**
+   - Dimensiones dinámicas por cantidad de jugadores: `2600 × 1050` para 2 jugadores y **`4200 × 1050`** para 4 jugadores.
+   - Relieve aleatorio combinando 4 armónicos y 2–3 picos/valles gaussianos por partida, más posiciones de aparición aleatorias con distancia mínima garantizada (`>= 1150 px` en 2P, `>= 1050 px` en 4P) y semilla mezclada al iniciar combate en `/arena/[code]`.
+2. **Zoom Responsivo 2K / Ultrawide (`src/domain/cameraEngine.ts` + `ArenaCanvas.tsx`):**
+   - `computeResponsiveZoom` y `getEffectiveViewport` garantizan un encuadre máximo de `1120 × 620` unidades del mundo independientemente de la resolución del monitor (incluyendo `2560×1080` y `3440×1440`), evitando que el mapa se corte y encuadrando únicamente al tirador activo.
+
+### Resultados de Verificación — Iteración 4 (2026-11-23)
+- `pnpm test` (`vitest run`): **14/14 pruebas unitarias en verde** (incluye validación de 20 semillas aleatorias de spawns 2P/4P y zoom responsivo en 5 resoluciones 720p–2K ultrawide).
+- `pnpm exec tsc --noEmit`: **0 errores**.
+- `pnpm run lint`: **0 errores, 0 advertencias**.
+- `pnpm run build`: **Compilación limpia (`14/14` rutas)**.
+
+---
+
+## 10. Iteración 5 — Zoom Out/In con Rueda del Ratón Acotado al Mapa
+
+### Cambios Realizados
+- **`src/domain/cameraEngine.ts`:** `applyCameraZoomDelta`, `computeMinZoomFactor` (`max(screenW / worldW, screenH / worldH)` para nunca cortar los bordes del mapa) e interpolación suave de `zoomFactor` → `targetZoomFactor` en `stepCamera`, con restablecimiento automático al cambiar de turno o pulsar **Centrar**.
+- **`src/engine/ArenaCanvas.tsx` y `src/app/arena/[code]/page.tsx`:** listener no pasivo de rueda del ratón (`wheel`) sobre el Canvas + indicador interactivo `Zoom XX% · Restablecer` junto al minimapa.
+
+### Resultados de Verificación — Iteración 5 (2026-11-23)
+- `pnpm test` (`vitest run`): **15/15 pruebas unitarias en verde** (incluye validación de zoom out/in acotado al mapa en 3440×1440 ultrawide 2K y restablecimiento al cambiar turno).
+- `pnpm exec tsc --noEmit`: **0 errores**.
+- `pnpm run lint`: **0 errores, 0 advertencias**.
+- `pnpm run build`: **Compilación limpia (`14/14` rutas)**.
+
+
+
+
+
+
+
+
 
 

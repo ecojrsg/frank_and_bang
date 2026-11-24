@@ -1,7 +1,7 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 20:57:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 20:57:00
+// @Last Modified time: 2026-11-23 22:42:00
 
 /**
  * Parabolic grenade physics and collision helpers for 2D Worms-style combat.
@@ -12,10 +12,10 @@ import { getTraitBonus } from "./statsCalculator";
 import { getSurfaceY } from "./terrainEngine";
 import type { FighterState, GrenadeProjectile } from "./types";
 
-export const GRAVITY_PX_PER_SEC2 = 460;
-const MIN_LAUNCH_SPEED = 220;
-const MAX_LAUNCH_SPEED = 620;
-const FIGHTER_HIT_RADIUS = 18;
+export const GRAVITY_PX_PER_SEC2 = 520;
+export const MIN_LAUNCH_SPEED = 280;
+export const MAX_LAUNCH_SPEED = 1120;
+const FIGHTER_HIT_RADIUS = 24;
 
 /**
  * Create a newly launched grenade projectile from a fighter's aim and power.
@@ -35,8 +35,8 @@ export function createGrenadeProjectile(
   const vy = -Math.sin(radians) * speed;
 
   return {
-    x: shooter.x + shooter.facing * 14,
-    y: shooter.y - 24,
+    x: shooter.x + shooter.facing * 18,
+    y: shooter.y - 32,
     vx,
     vy,
     blastRadius: computeBlastRadius(shooter.activeTraits),
@@ -91,7 +91,7 @@ export function checkGrenadeImpact(
     }
     const distance = Math.hypot(
       projectile.x - fighter.x,
-      projectile.y - (fighter.y - 16)
+      projectile.y - (fighter.y - 24)
     );
     if (distance <= FIGHTER_HIT_RADIUS) {
       return "impact";

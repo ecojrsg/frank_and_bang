@@ -1,7 +1,7 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 20:57:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 20:57:00
+// @Last Modified time: 2026-11-23 22:25:00
 
 /**
  * Core domain types for Frank and Bang.
@@ -11,6 +11,23 @@
 export type PartSlot = "head" | "torso" | "arms" | "legs";
 
 export type PartRarity = "normal" | "rare" | "unique";
+
+export type TeamId = "team1" | "team2";
+
+export type TeamColorKey =
+  | "red"
+  | "blue"
+  | "green"
+  | "amber"
+  | "purple"
+  | "pink";
+
+export interface TeamConfig {
+  id: TeamId;
+  name: string;
+  colorKey: TeamColorKey;
+  hex: string;
+}
 
 export type TraitEffectType =
   | "blast_radius_pct"
@@ -56,6 +73,17 @@ export interface Loadout {
   legs: Part;
 }
 
+export interface CreatureAppearance {
+  headId: string;
+  torsoId: string;
+  armsId: string;
+  legsId: string;
+  headRarity: PartRarity;
+  torsoRarity: PartRarity;
+  armsRarity: PartRarity;
+  legsRarity: PartRarity;
+}
+
 export interface CreatureStats {
   maxHp: number;
   attack: number;
@@ -79,8 +107,14 @@ export interface FighterState {
   playerId: string;
   displayName: string;
   role: "host" | "guest";
+  teamId: TeamId;
+  teamColor: string;
+  teamName: string;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
+  grounded: boolean;
   facing: 1 | -1;
   aimAngleDeg: number;
   hp: number;
@@ -91,6 +125,7 @@ export interface FighterState {
   moveEnergyLeft: number;
   activeTraits: SpecialTrait[];
   rarityAccent: PartRarity;
+  appearance: CreatureAppearance;
 }
 
 export interface GrenadeProjectile {
@@ -111,6 +146,7 @@ export interface DamageEvent {
 }
 
 export interface ExplosionEvent {
+  explosionId: number;
   x: number;
   y: number;
   radius: number;
@@ -128,13 +164,16 @@ export interface MatchSnapshot {
   terrainWidth: number;
   terrainHeight: number;
   heightMap: number[];
+  teams: Record<TeamId, TeamConfig>;
   fighters: FighterState[];
   projectile: GrenadeProjectile | null;
   lastExplosion: ExplosionEvent | null;
   winnerPlayerId: string | null;
+  winnerTeamId: TeamId | null;
 }
 
 export type PlayerCommand =
   | { type: "move"; direction: -1 | 1 }
+  | { type: "jump" }
   | { type: "aim"; angleDeg: number }
   | { type: "fire"; powerRatio: number };

@@ -1,11 +1,11 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:00:30
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 21:00:30
+// @Last Modified time: 2026-11-23 22:23:00
 
 /**
- * POST /api/rooms — Create a new multiplayer lobby where the creator acts
- * as the authoritative game Host and receives a 6-character join code.
+ * POST /api/rooms — Create a new multiplayer lobby (up to 4 players) where
+ * the creator acts as the authoritative game Host with a 6-character code.
  */
 
 import { NextResponse } from "next/server";
@@ -46,10 +46,11 @@ export async function POST(): Promise<NextResponse> {
         .insert({
           code,
           host_user_id: user.id,
+          player_ids: [user.id],
           status: "waiting",
           terrain_seed: terrainSeed,
         })
-        .select("code, host_user_id, guest_user_id, status, terrain_seed")
+        .select("code, host_user_id, guest_user_id, player_ids, status, terrain_seed")
         .single();
 
       if (!error && data) {

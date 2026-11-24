@@ -1,7 +1,7 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:06:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 21:06:00
+// @Last Modified time: 2026-11-23 22:23:00
 
 /**
  * GET /api/rooms/[code] — Return metadata for an existing multiplayer room.
@@ -30,7 +30,9 @@ export async function GET(
 
     const { data: room, error } = await supabase
       .from("game_rooms")
-      .select("code, host_user_id, guest_user_id, status, terrain_seed, winner_user_id")
+      .select(
+        "code, host_user_id, guest_user_id, player_ids, status, terrain_seed, winner_user_id, winner_team_id"
+      )
       .eq("code", normalizedCode)
       .maybeSingle();
 

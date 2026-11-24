@@ -69,7 +69,7 @@ Insertar capturas reales al ejecutar la app:
 5. Combate 2D en dos ventanas/computadoras mostrando código de sala, lanzamiento de granada, cráter destructible, indicador de turno y pantalla de victoria.
 
 ### 3.5 Liga al Código
-- **Repositorio Git:** `[Insertar URL del repositorio de GitHub aquí]`
+- **Repositorio GitHub:** https://github.com/ecojrsg/frank_and_bang
 - **Sesiones registradas:** Ver `docs/entregable final/sesiones/Frank Bang MVP Plan.md`.
 
 ---

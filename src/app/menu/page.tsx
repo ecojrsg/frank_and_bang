@@ -12,10 +12,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { Navbar } from "@/components/layout/Navbar";
 import { PartArtwork } from "@/components/parts/PartArtwork";
+import {
+  buildAppearanceFromLoadout,
+  drawAssembledCreature,
+} from "@/engine/creatureRenderer";
+import type { Loadout } from "@/domain/types";
 import type { PlayerFullState } from "@/infrastructure/supabase/partsRepository";
 
 export default function MenuPage() {
@@ -130,12 +135,12 @@ export default function MenuPage() {
                 Combate 2D Multijugador (Host-Servidor)
               </span>
               <h1 className="mt-1 text-2xl font-black text-white">
-                Jugar Partida de Artilleria
+                Jugar Partida de Artilleria (Hasta 4 Jugadores)
               </h1>
               <p className="mt-1.5 text-sm text-slate-300">
-                Quien crea la sala se convierte en el servidor de la partida y
-                comparte un codigo de 6 caracteres para combatir desde otra
-                computadora.
+                Quien crea la sala es el servidor de la partida y comparte un
+                codigo de 6 caracteres. Juega 1 vs 1 con 2 jugadores o 2 vs 2
+                por equipos personalizables con 4 jugadores.
               </p>
             </div>
 
@@ -268,7 +273,16 @@ export default function MenuPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-slate-950/90 p-3">
+              <MiniCreatureBadge
+                loadout={state.loadout}
+                displayName={state.profile.displayName}
+              />
+              <span className="mt-1 text-[11px] font-bold text-emerald-300">
+                Criatura Ensamblada
+              </span>
+            </div>
             {equippedParts.map((part) => (
               <div
                 key={part.id}
@@ -293,5 +307,61 @@ export default function MenuPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+/**
+ * Render a compact live assembled creature canvas on the Main Menu.
+ */
+function MiniCreatureBadge({
+  loadout,
+  displayName,
+}: {
+  loadout: Loadout;
+  displayName: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+
+    const appearance = buildAppearanceFromLoadout(loadout);
+    let frameId = 0;
+
+    const render = (nowMs: number) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawAssembledCreature(ctx, {
+        x: canvas.width / 2,
+        y: canvas.height - 16,
+        facing: 1,
+        aimAngleDeg: 38,
+        appearance,
+        teamColor: "#34d399",
+        scale: 1.55,
+        timeSec: nowMs / 1000,
+        isAlive: true,
+      });
+      frameId = window.requestAnimationFrame(render);
+    };
+
+    frameId = window.requestAnimationFrame(render);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [loadout]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={150}
+      height={128}
+      aria-label={`Vista de ${displayName}`}
+      className="h-28 w-36"
+    />
   );
 }

@@ -1,11 +1,11 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 20:57:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 20:57:00
+// @Last Modified time: 2026-11-23 21:56:30
 
 /**
- * Generate standalone isometric SVG assets for Frank and Bang body parts
- * and the TCG card back using the anatomy skill kit (iso-kit.mjs).
+ * Generate standalone isometric SVG assets for all 12 Frank and Bang body parts
+ * (heads, torsos, arms, legs) and the TCG card back using anatomy (iso-kit.mjs).
  */
 
 import { mkdirSync, writeFileSync } from "fs";
@@ -413,6 +413,256 @@ function buildCardBackSvg() {
 }
 
 /**
+ * Render Normal Head: Stitch Skull with lateral steel neck bolts.
+ */
+function buildStitchSkullHeadSvg() {
+  const basePlan = { x: 0, y: 0, w: 92, d: 72, r: 6 };
+  const projection = fitProjection(
+    [...boxCorners(basePlan, 0, 72)],
+    WIDTH,
+    HEIGHT,
+    { pad: 24, azimuth: 44, elevation: 30 }
+  );
+  const body = [...buildBasePlinth(basePlan, projection)];
+
+  // Neck collar and main skull cranium block.
+  body.push(solidSvg(cylinder(46, 36, 14, 8, 10, projection), { tone: "mid" }));
+  const cranium = { x: 24, y: 18, w: 44, d: 36, r: 7 };
+  const stitches = topTicks(30, 62, 6, 2, 24, 58, [2.5, 4], projection, "x");
+  body.push(
+    solidSvg(slabOf(cranium, 18, 40, projection, 8, 0.8), {
+      tone: "hi",
+      inner:
+        lineSvg(stitches.minor, { tone: "lo" }) +
+        lineSvg(stitches.major, { tone: "hi" }) +
+        lineSvg(lineOnTop([30, 34], [62, 34], 58, projection), { tone: "mid" }),
+    })
+  );
+
+  // Twin lateral steel Frankenstein bolts.
+  body.push(solidSvg(cylinder(20, 36, 5.5, 28, 12, projection), { tone: "hi", lit: true }));
+  body.push(solidSvg(cylinder(72, 36, 5.5, 28, 12, projection), { tone: "hi", lit: true }));
+
+  return figureSvg({
+    width: WIDTH,
+    height: HEIGHT,
+    label: "Craneo Cosido - ilustracion isometrica",
+    body,
+    standalone: "dark",
+  });
+}
+
+/**
+ * Render Rare Head: Brass Visor with calibrated telescopic optics.
+ */
+function buildBrassVisorHeadSvg() {
+  const basePlan = { x: 0, y: 0, w: 96, d: 74, r: 6 };
+  const projection = fitProjection(
+    [...boxCorners(basePlan, 0, 74)],
+    WIDTH,
+    HEIGHT,
+    { pad: 24, azimuth: 43, elevation: 30 }
+  );
+  const body = [...buildBasePlinth(basePlan, projection)];
+
+  // Helmet shell with side dial housing.
+  const helm = { x: 22, y: 18, w: 48, d: 38, r: 8 };
+  body.push(solidSvg(slabOf(helm, 14, 42, projection, 8, 0.8), { tone: "mid" }));
+  body.push(
+    solidSvg(cylinder(46, 37, 19, 56, 8, projection), {
+      tone: "hi",
+      inner: lineSvg(ring(46, 37, 15, 64, projection), { tone: "lo" }),
+    })
+  );
+
+  // Lit telescopic brass visor bar across front face.
+  const visor = { x: 34, y: 50, w: 38, d: 14, r: 4 };
+  body.push(solidSvg(slabOf(visor, 30, 14, projection, 6, 0.6), { tone: "hi", lit: true }));
+  body.push(solidSvg(cylinder(66, 57, 7, 32, 12, projection), { tone: "hi", lit: true }));
+
+  // Calibrated side antenna wire.
+  body.push(
+    wireSvg(iso([24, 24, 54], projection), iso([66, 57, 44], projection), {
+      via: [iso([44, 16, 62], projection)],
+      tone: "hi",
+    })
+  );
+
+  return figureSvg({
+    width: WIDTH,
+    height: HEIGHT,
+    label: "Visor de Laton - ilustracion isometrica",
+    body,
+    standalone: "dark",
+  });
+}
+
+/**
+ * Render Unique Head: Voltaic Crown with dual induction spires.
+ */
+function buildVoltaicCrownHeadSvg() {
+  const basePlan = { x: 0, y: 0, w: 100, d: 76, r: 7 };
+  const projection = fitProjection(
+    [...boxCorners(basePlan, 0, 78)],
+    WIDTH,
+    HEIGHT,
+    { pad: 22, azimuth: 45, elevation: 31 }
+  );
+  const body = [...buildBasePlinth(basePlan, projection)];
+
+  // Armored head block and crown ring.
+  const cranium = { x: 26, y: 20, w: 48, d: 36, r: 7 };
+  body.push(solidSvg(slabOf(cranium, 12, 34, projection, 8, 0.7), { tone: "mid" }));
+  body.push(solidSvg(cylinder(50, 38, 22, 46, 7, projection), { tone: "hi" }));
+
+  // Twin vertical tesla spires with lit discharge spheres.
+  body.push(solidSvg(cylinder(34, 38, 6.5, 53, 18, projection), { tone: "hi" }));
+  body.push(solidSvg(cylinder(66, 38, 6.5, 53, 18, projection), { tone: "hi" }));
+  body.push(solidSvg(cylinder(34, 38, 8, 68, 6, projection), { tone: "hi", lit: true }));
+  body.push(solidSvg(cylinder(66, 38, 8, 68, 6, projection), { tone: "hi", lit: true }));
+
+  // Voltaic arc linking both spires.
+  body.push(
+    wireSvg(iso([34, 38, 72], projection), iso([66, 38, 72], projection), {
+      via: [iso([50, 38, 80], projection)],
+      tone: "lit",
+      dashed: true,
+    })
+  );
+
+  return figureSvg({
+    width: WIDTH,
+    height: HEIGHT,
+    label: "Corona Voltaica - ilustracion isometrica",
+    body,
+    standalone: "dark",
+  });
+}
+
+/**
+ * Render Normal Torso: Canvas Ribcage stitched chest frame.
+ */
+function buildCanvasRibcageTorsoSvg() {
+  const basePlan = { x: 0, y: 0, w: 96, d: 72, r: 6 };
+  const projection = fitProjection(
+    [...boxCorners(basePlan, 0, 72)],
+    WIDTH,
+    HEIGHT,
+    { pad: 24, azimuth: 45, elevation: 30 }
+  );
+  const body = [...buildBasePlinth(basePlan, projection)];
+
+  // Spine column and ribbed torso chassis.
+  body.push(solidSvg(cylinder(48, 26, 9, 10, 50, projection), { tone: "mid" }));
+  const chest = { x: 22, y: 20, w: 52, d: 34, r: 6 };
+  const ribLines = topTicks(28, 68, 8, 2, 22, 54, [4, 7], projection, "x");
+  body.push(
+    solidSvg(slabOf(chest, 16, 38, projection, 8, 0.7), {
+      tone: "hi",
+      inner:
+        lineSvg(ribLines.minor, { tone: "lo" }) +
+        lineSvg(ribLines.major, { tone: "hi" }),
+    })
+  );
+
+  // Lit sternum buckle clasp.
+  body.push(
+    solidSvg(slabOf({ x: 40, y: 46, w: 16, d: 10, r: 2 }, 26, 14, projection, 4), {
+      tone: "hi",
+      lit: true,
+    })
+  );
+
+  return figureSvg({
+    width: WIDTH,
+    height: HEIGHT,
+    label: "Caja Toracica de Lona - ilustracion isometrica",
+    body,
+    standalone: "dark",
+  });
+}
+
+/**
+ * Render Rare Torso: Boiler Plate riveted iron armor chest.
+ */
+function buildBoilerPlateTorsoSvg() {
+  const basePlan = { x: 0, y: 0, w: 102, d: 74, r: 6 };
+  const projection = fitProjection(
+    [...boxCorners(basePlan, 0, 74)],
+    WIDTH,
+    HEIGHT,
+    { pad: 24, azimuth: 44, elevation: 30 }
+  );
+  const body = [...buildBasePlinth(basePlan, projection)];
+
+  // Heavy iron boiler hull with shoulder exhaust stack.
+  const hull = { x: 20, y: 18, w: 62, d: 38, r: 7 };
+  body.push(
+    solidSvg(slabOf(hull, 12, 42, projection, 8, 0.8), {
+      tone: "hi",
+      inner: lineSvg(sideSeam(hull, 34, projection), { tone: "mid" }),
+    })
+  );
+  body.push(solidSvg(cylinder(30, 24, 7, 54, 14, projection), { tone: "mid" }));
+
+  // Lit furnace pressure gauge on front hatch.
+  body.push(solidSvg(cylinder(54, 52, 11, 24, 12, projection), { tone: "hi", lit: true }));
+  body.push(lineSvg(ring(54, 52, 8, 36, projection), { tone: "lo" }));
+
+  return figureSvg({
+    width: WIDTH,
+    height: HEIGHT,
+    label: "Coraza de Caldera - ilustracion isometrica",
+    body,
+    standalone: "dark",
+  });
+}
+
+/**
+ * Render Unique Torso: Reactor Core shielded blast chest.
+ */
+function buildReactorCoreTorsoSvg() {
+  const basePlan = { x: 0, y: 0, w: 106, d: 76, r: 7 };
+  const projection = fitProjection(
+    [...boxCorners(basePlan, 0, 78)],
+    WIDTH,
+    HEIGHT,
+    { pad: 22, azimuth: 45, elevation: 31 }
+  );
+  const body = [...buildBasePlinth(basePlan, projection)];
+
+  // Twin armored flank shields.
+  const armor = { x: 18, y: 18, w: 70, d: 40, r: 8 };
+  const vents = topTicks(24, 82, 6, 3, 20, 56, [3, 5], projection, "x");
+  body.push(
+    solidSvg(slabOf(armor, 12, 44, projection, 8, 0.8), {
+      tone: "mid",
+      inner:
+        lineSvg(vents.minor, { tone: "lo" }) +
+        lineSvg(vents.major, { tone: "hi" }),
+    })
+  );
+
+  // Central lit reactor chamber and cooling coil ring.
+  body.push(solidSvg(cylinder(53, 38, 16, 48, 10, projection), { tone: "hi" }));
+  body.push(solidSvg(cylinder(53, 38, 10, 56, 10, projection), { tone: "hi", lit: true }));
+  body.push(
+    wireSvg(iso([26, 38, 56], projection), iso([80, 38, 56], projection), {
+      via: [iso([53, 56, 62], projection)],
+      tone: "lit",
+    })
+  );
+
+  return figureSvg({
+    width: WIDTH,
+    height: HEIGHT,
+    label: "Nucleo Reactor - ilustracion isometrica",
+    body,
+    standalone: "dark",
+  });
+}
+
+/**
  * Write one SVG file ensuring parent directories exist.
  */
 function writeAsset(relativePath, svgContent) {
@@ -423,6 +673,12 @@ function writeAsset(relativePath, svgContent) {
 }
 
 function main() {
+  writeAsset("parts/head/head_stitch_skull.svg", buildStitchSkullHeadSvg());
+  writeAsset("parts/head/head_brass_visor.svg", buildBrassVisorHeadSvg());
+  writeAsset("parts/head/head_voltaic_crown.svg", buildVoltaicCrownHeadSvg());
+  writeAsset("parts/torso/torso_canvas_ribcage.svg", buildCanvasRibcageTorsoSvg());
+  writeAsset("parts/torso/torso_boiler_plate.svg", buildBoilerPlateTorsoSvg());
+  writeAsset("parts/torso/torso_reactor_core.svg", buildReactorCoreTorsoSvg());
   writeAsset("parts/arms/arms_copper_hook.svg", buildCopperHookArmsSvg());
   writeAsset("parts/arms/arms_pneumatic_piston.svg", buildPneumaticPistonArmsSvg());
   writeAsset("parts/arms/arms_tesla_catapult.svg", buildTeslaCatapultArmsSvg());

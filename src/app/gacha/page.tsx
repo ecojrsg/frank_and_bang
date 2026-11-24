@@ -17,6 +17,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { TcgPartCard } from "@/components/parts/TcgPartCard";
 import { PACK_COST_COINS } from "@/domain/gachaEngine";
 import type { GachaPullResult } from "@/domain/types";
+import { soundEngine } from "@/engine/soundEngine";
 import type { PlayerFullState } from "@/infrastructure/supabase/partsRepository";
 
 export default function GachaPage() {
@@ -60,6 +61,7 @@ export default function GachaPage() {
         throw new Error(data.error ?? "No se pudo abrir el sobre.");
       }
 
+      soundEngine.playPackOpen();
       setPulls(data.pulls);
       setRevealedFlags(data.pulls.map(() => false));
       setLastBonusCoins(data.totalDuplicateCoins ?? 0);
@@ -85,10 +87,18 @@ export default function GachaPage() {
   }
 
   function flipCard(index: number) {
+    const target = pulls[index];
+    if (target && !revealedFlags[index]) {
+      soundEngine.playCardFlip(target.part.rarity);
+    }
     setRevealedFlags((prev) => prev.map((flag, i) => (i === index ? true : flag)));
   }
 
   function flipAllCards() {
+    const firstUnflipped = pulls.find((_, index) => !revealedFlags[index]);
+    if (firstUnflipped) {
+      soundEngine.playCardFlip(firstUnflipped.part.rarity);
+    }
     setRevealedFlags((prev) => prev.map(() => true));
   }
 

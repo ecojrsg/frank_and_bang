@@ -303,6 +303,59 @@ stateDiagram-v2
     MatchFinished --> [*] : Recompensa de FrankenCoins
 ```
 
+### D. Máquina de Estados de la Cámara Dinámica (`src/domain/cameraEngine.ts`)
+
+El campo de batalla expandido (`2200 × 900`) excede el viewport de pantalla completa (`100vw × 100vh`), por lo que `Camera2D` gobierna el encuadre suavizado:
+
+```mermaid
+stateDiagram-v2
+    [*] --> FollowAttacker : Inicio de partida / Nuevo turno
+    FollowAttacker --> ManualScout : Jugador arrastra Canvas o hace clic en Minimapa
+    ManualScout --> FollowAttacker : Jugador mueve, apunta, dispara o pulsa Centrar
+    FollowAttacker --> FollowProjectile : Granada lanzada (phase == projectile)
+    FollowProjectile --> ImpactHold : Detonacion detectada (nuevo explosionId)
+    ImpactHold --> FollowAttacker : Fin de pausa de impacto (~0.95s) -> viaja al siguiente turno
+```
+
+### E. Renderizado Compartido, VFX, Audio e Instrumento `anatomy` (Iteración 2)
+
+```mermaid
+flowchart LR
+    DB["Supabase (parts_catalog 12/12 + bucket parts-assets)"] --> LAB["Laboratorio (/lab)"]
+    DB --> GACHA["Gacha TCG (/gacha)"]
+    LAB --> RIG["CreatureRenderer compartido (creatureRenderer.ts)"]
+    ARENA["Arena Fullscreen 100vw x 100vh (/arena/[code])"] --> CAM["Camera2D Engine (cameraEngine.ts)"]
+    ARENA --> RIG
+    ARENA --> VFX["Envelope VFX Engine (vfxEngine.ts)"]
+    ARENA --> DIAL["ArtilleryDialGauge (anatomy SVG HUD)"]
+    ARENA --> SFX["Web Audio SFX Engine (soundEngine.ts)"]
+    GACHA --> SFX
+    LAB --> SFX
+```
+
+- **Contrato `CreatureAppearance`:** se propaga en `RoomPresencePayload` y `FighterState` (`headId`, `torsoId`, `armsId`, `legsId` y rarezas por ranura) para que `drawAssembledCreature` dibuje exactamente la misma criatura ensamblada en la vista previa del **Laboratorio** (pedestal + mini escena en juego) y en la **Arena 2D**.
+- **Catálogo visual 12/12 en `parts-assets`:** todas las piezas (`parts/head/*.svg`, `parts/torso/*.svg`, `parts/arms/*.svg`, `parts/legs/*.svg` + `cards/card_back.svg`) se generan con `anatomy` y se sirven desde Supabase Storage.
+
+### F. Multijugador hasta 4 Jugadores, Equipos Personalizables y Salto (`Shift`) (Iteración 3)
+
+- **Esquema `public.game_rooms` (4 jugadores):** columnas `player_ids uuid[]` (máximo 4 con `CHECK` e índice GIN), `max_players = 4` y `winner_team_id ('team1' | 'team2')`, con políticas RLS actualizadas para permitir entrada de hasta 4 participantes autenticados en salas `'waiting'`.
+- **Reglas de Lobby por Equipos (`src/domain/teamLobby.ts`):**
+  - 2 equipos personalizables (`team1`, `team2`) con nombre editable y paleta de 6 colores **mutuamente excluyentes** (si un equipo elige un color, queda bloqueado para el rival).
+  - **2 jugadores (1 vs 1):** puede iniciar el combate (`1` por equipo).
+  - **3 jugadores:** bloquea el inicio y muestra estado de espera por el **4.º jugador**.
+  - **4 jugadores (2 vs 2):** puede iniciar el combate con turnos alternados entre equipos (`T1-P1 → T2-P1 → T1-P2 → T2-P2`).
+- **Física de Salto (`Shift`):** comando `{ type: "jump" }` sobre `FighterState` (`vx`, `vy`, `grounded`) que impulsa a la criatura hacia arriba y adelante con gravedad compartida, consumiendo energía de movimiento y permitiendo librar bordes de cráteres.
+
+### G. Generación Aleatoria de Terreno, Spawns con Distancia Mínima y Zoom Responsivo 2K/Ultrawide (Iteración 4)
+
+- **Escala dinámica del mapa (`getArenaDimensions`):** `2600 × 1050` para partidas 1 vs 1 (2 jugadores) y **`4200 × 1050`** para partidas 2 vs 2 (4 jugadores).
+- **Relieve y apariciones aleatorias (`generateTerrainHeightMap` + `generateSpawnPositions`):**
+  - El terreno combina 4 armónicos aleatorios con 2–3 picos y valles gaussianos en cada partida (`y` entre `240` y `height - 110`).
+  - Los puntos de aparición se sortean aleatoriamente respetando márgenes laterales (`180 px`) y una separación mínima garantizada entre cualquier par de jugadores (`>= 1150 px` en 2P, `>= 1050 px` en 4P).
+- **Cámara Responsiva 2K/Ultrawide y Zoom con Rueda del Ratón (`computeResponsiveZoom` / `applyCameraZoomDelta`):**
+  - Ajusta el factor de zoom `max(screenW / 1120, screenH / 620, 1)` para que, incluso en monitores ultrawide 2K (`2560×1080` o `3440×1440`) o 4K, el encuadre por defecto nunca supere `1120 × 620` unidades del mundo: solo se enfoca al atacante en turno.
+  - Con la **rueda del ratón**, el jugador puede hacer *zoom out* / *zoom in* suavizado (`zoomFactor` → `targetZoomFactor`) para localizar a los demás jugadores; el límite inferior queda acotado a `max(screenW / worldW, screenH / worldH)` para garantizar que la perspectiva jamás corte los bordes del mapa, y se restablece suavemente al pulsar **Centrar** o iniciar un nuevo turno.
+
 ---
 
 ## 5. Guía de Extensibilidad: Tabla `public.parts_catalog` y Bucket `parts-assets`

@@ -14,10 +14,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { CreaturePreviewPanel } from "@/components/lab/CreaturePreviewPanel";
 import { Navbar } from "@/components/layout/Navbar";
 import { PartArtwork } from "@/components/parts/PartArtwork";
 import { computeCreatureStats } from "@/domain/statsCalculator";
 import type { Loadout, Part, PartSlot } from "@/domain/types";
+import { soundEngine } from "@/engine/soundEngine";
 import type { PlayerFullState } from "@/infrastructure/supabase/partsRepository";
 
 const SLOT_TABS: { slot: PartSlot; label: string }[] = [
@@ -106,6 +108,7 @@ export default function LabPage() {
     if (!ownedSet.has(part.id)) {
       return;
     }
+    soundEngine.playPartEquip();
     setFeedback(null);
     setDraft((prev) => (prev ? { ...prev, [part.slot]: part } : prev));
   }
@@ -129,6 +132,11 @@ export default function LabPage() {
               Ensamblaje de Criatura
             </h1>
           </div>
+
+          <CreaturePreviewPanel
+            loadout={draft}
+            displayName={state.profile.displayName}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             {SLOT_TABS.map(({ slot, label }) => {

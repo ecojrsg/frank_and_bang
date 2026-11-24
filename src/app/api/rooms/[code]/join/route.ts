@@ -1,16 +1,18 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:00:30
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 21:00:30
+// @Last Modified time: 2026-11-23 22:23:00
 
 /**
  * POST /api/rooms/[code]/join — Validate a 6-character room code and join
- * the Host-Authoritative multiplayer lobby as Guest.
+ * the Host-Authoritative multiplayer lobby (supporting up to 4 players).
  */
 
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/infrastructure/supabase/server";
+
+const MAX_ROOM_PLAYERS = 4;
 
 export async function POST(
   _request: Request,
@@ -31,7 +33,7 @@ export async function POST(
 
     const { data: room, error } = await supabase
       .from("game_rooms")
-      .select("code, host_user_id, guest_user_id, status, terrain_seed")
+      .select("code, host_user_id, guest_user_id, player_ids, status, terrain_seed")
       .eq("code", normalizedCode)
       .maybeSingle();
 
@@ -42,23 +44,34 @@ export async function POST(
       );
     }
 
-    if (room.host_user_id === user.id || room.guest_user_id === user.id) {
+    const currentPlayers = Array.isArray(room.player_ids)
+      ? (room.player_ids as string[])
+      : [];
+
+    if (room.host_user_id === user.id || currentPlayers.includes(user.id)) {
       return NextResponse.json({ room });
     }
 
-    if (room.status !== "waiting" || room.guest_user_id !== null) {
+    if (room.status !== "waiting" || currentPlayers.length >= MAX_ROOM_PLAYERS) {
       return NextResponse.json(
-        { error: "Esta sala ya esta llena o la partida ya comenzo." },
+        {
+          error:
+            "Esta sala ya esta llena (maximo 4 jugadores) o la partida ya comenzo.",
+        },
         { status: 409 }
       );
     }
 
+    const nextPlayers = [...currentPlayers, user.id];
     const { data: updated, error: joinError } = await supabase
       .from("game_rooms")
-      .update({ guest_user_id: user.id })
+      .update({
+        player_ids: nextPlayers,
+        guest_user_id: room.guest_user_id ?? user.id,
+      })
       .eq("code", normalizedCode)
-      .is("guest_user_id", null)
-      .select("code, host_user_id, guest_user_id, status, terrain_seed")
+      .eq("status", "waiting")
+      .select("code, host_user_id, guest_user_id, player_ids, status, terrain_seed")
       .single();
 
     if (joinError || !updated) {

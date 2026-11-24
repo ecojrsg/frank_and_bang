@@ -1,18 +1,19 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 20:57:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 20:57:00
+// @Last Modified time: 2026-11-23 22:25:00
 
 /**
  * Pure combat damage and victory resolution rules for Frank and Bang.
  */
 
 import { getTraitBonus } from "./statsCalculator";
-import type { DamageEvent, FighterState, SpecialTrait } from "./types";
+import type { DamageEvent, FighterState, SpecialTrait, TeamId } from "./types";
 
-export const BASE_GRENADE_BLAST_RADIUS = 44;
+export const BASE_GRENADE_BLAST_RADIUS = 56;
 const DIRECT_HIT_THRESHOLD_RATIO = 0.4;
 const MIN_DAMAGE = 1;
+const FIGHTER_TORSO_CENTER_Y = 24;
 
 /**
  * Calculate effective damage after defense mitigation and splash falloff.
@@ -60,7 +61,10 @@ export function applyExplosionDamage(
 ): { updatedFighters: FighterState[]; damages: DamageEvent[] } {
   const damages: DamageEvent[] = [];
   const updatedFighters = fighters.map((fighter) => {
-    const distance = Math.hypot(fighter.x - impactX, fighter.y - 16 - impactY);
+    const distance = Math.hypot(
+      fighter.x - impactX,
+      fighter.y - FIGHTER_TORSO_CENTER_Y - impactY
+    );
     if (distance > blastRadius || fighter.hp <= 0) {
       return fighter;
     }
@@ -101,6 +105,29 @@ export function determineWinner(fighters: FighterState[]): string | null {
   }
   if (alive.length === 0 && fighters.length > 0) {
     return fighters[0].playerId;
+  }
+  return null;
+}
+
+/**
+ * Determine the winning team when all members of the opposing team reach 0 HP.
+ */
+export function determineWinningTeam(fighters: FighterState[]): TeamId | null {
+  const aliveTeam1 = fighters.some(
+    (fighter) => fighter.teamId === "team1" && fighter.hp > 0
+  );
+  const aliveTeam2 = fighters.some(
+    (fighter) => fighter.teamId === "team2" && fighter.hp > 0
+  );
+
+  if (aliveTeam1 && !aliveTeam2) {
+    return "team1";
+  }
+  if (aliveTeam2 && !aliveTeam1) {
+    return "team2";
+  }
+  if (!aliveTeam1 && !aliveTeam2 && fighters.length > 0) {
+    return fighters[0].teamId;
   }
   return null;
 }

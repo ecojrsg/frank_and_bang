@@ -3,26 +3,50 @@
 // @Author: Jonathan Serna
 // @Date:   2026-11-23 21:06:00
 // @Last Modified by:   Jonathan Serna
-// @Last Modified time: 2026-11-23 21:06:00
+// @Last Modified time: 2026-11-23 22:26:00
 
 /**
- * Multiplayer room lobby and live 2D Worms-style artillery battlefield
- * powered by Host-Authoritative state synchronization over Supabase Realtime.
+ * Multiplayer room lobby (up to 4 players with customizable teams and exclusive
+ * colors) and immersive fullscreen 2D Worms artillery arena powered by
+ * Host-Authoritative state synchronization over Supabase Realtime.
  */
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
+import { ArtilleryDialGauge } from "@/components/arena/ArtilleryDialGauge";
 import { Navbar } from "@/components/layout/Navbar";
 import {
   applyPlayerCommand,
   createInitialMatchState,
   stepHostSimulation,
 } from "@/domain/gameRoomHost";
-import type { MatchSnapshot, PlayerCommand } from "@/domain/types";
+import {
+  assignPlayerToTeam,
+  createDefaultLobbyTeams,
+  setTeamColor,
+  setTeamName,
+  syncLobbyAssignments,
+  TEAM_COLOR_PALETTE,
+  validateMatchStart,
+  type LobbyTeamsState,
+} from "@/domain/teamLobby";
+import type {
+  CreatureAppearance,
+  MatchSnapshot,
+  PlayerCommand,
+  TeamColorKey,
+  TeamConfig,
+  TeamId,
+} from "@/domain/types";
 import { ArenaCanvas } from "@/engine/ArenaCanvas";
+import {
+  buildAppearanceFromLoadout,
+  drawAssembledCreature,
+} from "@/engine/creatureRenderer";
+import { soundEngine } from "@/engine/soundEngine";
 import { createSupabaseBrowserClient } from "@/infrastructure/supabase/client";
 import type { PlayerFullState } from "@/infrastructure/supabase/partsRepository";
 import {
@@ -30,6 +54,8 @@ import {
   getRoomChannelName,
   REALTIME_EVENTS,
   type InputCommandMessage,
+  type LobbyActionMessage,
+  type LobbyStateMessage,
   type RoomPresencePayload,
   type SnapshotBroadcastMessage,
 } from "@/network/realtimeProtocol";
@@ -38,8 +64,31 @@ interface RoomRecord {
   code: string;
   host_user_id: string;
   guest_user_id: string | null;
+  player_ids: string[];
   status: "waiting" | "playing" | "finished";
   terrain_seed: number;
+}
+
+/**
+ * Reduce one team-lobby action safely using pure domain rules.
+ */
+function applyLobbyAction(
+  current: LobbyTeamsState,
+  action: LobbyActionMessage,
+  connectedIds: string[]
+): LobbyTeamsState {
+  if (action.type === "switch_team") {
+    return assignPlayerToTeam(
+      current,
+      action.playerId,
+      action.targetTeam,
+      connectedIds
+    );
+  }
+  if (action.type === "set_team_color") {
+    return setTeamColor(current, action.teamId, action.colorKey);
+  }
+  return setTeamName(current, action.teamId, action.name);
 }
 
 export default function ArenaRoomPage() {
@@ -49,27 +98,69 @@ export default function ArenaRoomPage() {
 
   const [playerState, setPlayerState] = useState<PlayerFullState | null>(null);
   const [room, setRoom] = useState<RoomRecord | null>(null);
-  const [hostPresence, setHostPresence] = useState<RoomPresencePayload | null>(null);
-  const [guestPresence, setGuestPresence] = useState<RoomPresencePayload | null>(null);
+  const [participants, setParticipants] = useState<RoomPresencePayload[]>([]);
+  const [lobbyState, setLobbyState] = useState<LobbyTeamsState>(() =>
+    createDefaultLobbyTeams("")
+  );
   const [snapshot, setSnapshot] = useState<MatchSnapshot | null>(null);
   const [chargePower, setChargePower] = useState(0);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [recenterNonce, setRecenterNonce] = useState(0);
+  const [resetViewNonce, setResetViewNonce] = useState(0);
   const [rewardMessage, setRewardMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const arenaShellRef = useRef<HTMLDivElement | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const snapshotRef = useRef<MatchSnapshot | null>(null);
+  const lobbyStateRef = useRef<LobbyTeamsState>(lobbyState);
+  const participantsRef = useRef<RoomPresencePayload[]>([]);
   const chargingRef = useRef(false);
   const chargeValueRef = useRef(0);
   const rewardClaimedRef = useRef(false);
+  const lastTurnNotifiedRef = useRef<number>(0);
 
   const isHost =
     Boolean(playerState && room) && room?.host_user_id === playerState?.profile.id;
 
-  // Keep ref mirrored for the 60 Hz host simulation loop.
+  useEffect(() => {
+    setMuted(soundEngine.isMuted());
+  }, []);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  useEffect(() => {
+    lobbyStateRef.current = lobbyState;
+  }, [lobbyState]);
+
+  useEffect(() => {
+    participantsRef.current = participants;
+  }, [participants]);
+
+  // Trigger turn alert chime when active turn advances.
+  useEffect(() => {
+    if (!snapshot || !playerState || snapshot.phase === "finished") {
+      return;
+    }
+    if (snapshot.turnNumber > lastTurnNotifiedRef.current) {
+      lastTurnNotifiedRef.current = snapshot.turnNumber;
+      soundEngine.playTurnAlert(
+        snapshot.activePlayerId === playerState.profile.id
+      );
+    }
+  }, [snapshot, playerState]);
 
   // 1. Load player profile & room metadata.
   useEffect(() => {
@@ -102,6 +193,9 @@ export default function ArenaRoomPage() {
 
         setPlayerState(profileData);
         setRoom(roomData.room);
+        const initialLobby = createDefaultLobbyTeams(roomData.room.host_user_id);
+        lobbyStateRef.current = initialLobby;
+        setLobbyState(initialLobby);
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Error cargando sala."
@@ -114,7 +208,6 @@ export default function ArenaRoomPage() {
     }
   }, [roomCode, router]);
 
-  // Broadcast authoritative snapshot from Host to Guest.
   const broadcastSnapshot = useCallback((nextSnapshot: MatchSnapshot) => {
     snapshotRef.current = nextSnapshot;
     setSnapshot(nextSnapshot);
@@ -122,6 +215,16 @@ export default function ArenaRoomPage() {
       type: "broadcast",
       event: REALTIME_EVENTS.stateSnapshot,
       payload: { snapshot: nextSnapshot } satisfies SnapshotBroadcastMessage,
+    });
+  }, []);
+
+  const broadcastLobbyState = useCallback((nextLobby: LobbyTeamsState) => {
+    lobbyStateRef.current = nextLobby;
+    setLobbyState(nextLobby);
+    channelRef.current?.send({
+      type: "broadcast",
+      event: REALTIME_EVENTS.lobbyState,
+      payload: { lobby: nextLobby } satisfies LobbyStateMessage,
     });
   }, []);
 
@@ -134,6 +237,7 @@ export default function ArenaRoomPage() {
     const supabase = createSupabaseBrowserClient();
     const role: "host" | "guest" =
       room.host_user_id === playerState.profile.id ? "host" : "guest";
+    const joinedAt = Date.now();
 
     const channel = supabase.channel(getRoomChannelName(room.code), {
       config: {
@@ -145,9 +249,39 @@ export default function ArenaRoomPage() {
     channel
       .on("presence", { event: "sync" }, () => {
         const rawState = channel.presenceState() as Record<string, unknown[]>;
-        const { host, guest } = extractRoomParticipants(rawState);
-        setHostPresence(host);
-        setGuestPresence(guest);
+        const connected = extractRoomParticipants(rawState);
+        participantsRef.current = connected;
+        setParticipants(connected);
+
+        if (role === "host") {
+          const synced = syncLobbyAssignments(
+            lobbyStateRef.current,
+            connected.map((p) => p.playerId)
+          );
+          broadcastLobbyState(synced);
+        }
+      })
+      .on("broadcast", { event: REALTIME_EVENTS.lobbyState }, ({ payload }) => {
+        if (role === "host") {
+          return;
+        }
+        const msg = payload as LobbyStateMessage;
+        if (msg?.lobby) {
+          lobbyStateRef.current = msg.lobby;
+          setLobbyState(msg.lobby);
+        }
+      })
+      .on("broadcast", { event: REALTIME_EVENTS.lobbyAction }, ({ payload }) => {
+        if (role !== "host") {
+          return;
+        }
+        const action = payload as LobbyActionMessage;
+        if (!action?.type) {
+          return;
+        }
+        const connectedIds = participantsRef.current.map((p) => p.playerId);
+        const updated = applyLobbyAction(lobbyStateRef.current, action, connectedIds);
+        broadcastLobbyState(updated);
       })
       .on("broadcast", { event: REALTIME_EVENTS.matchStart }, ({ payload }) => {
         const msg = payload as SnapshotBroadcastMessage;
@@ -187,8 +321,10 @@ export default function ArenaRoomPage() {
             playerId: playerState.profile.id,
             displayName: playerState.profile.displayName,
             role,
+            joinedAt,
             stats: playerState.stats,
             rarityAccent: playerState.highestRarity,
+            appearance: buildAppearanceFromLoadout(playerState.loadout),
           };
           await channel.track(presencePayload);
         }
@@ -198,9 +334,9 @@ export default function ArenaRoomPage() {
       channelRef.current = null;
       supabase.removeChannel(channel);
     };
-  }, [playerState, room, broadcastSnapshot]);
+  }, [playerState, room, broadcastSnapshot, broadcastLobbyState]);
 
-  // 3. Host-Authoritative simulation loop (ticks timer & grenade physics).
+  // 3. Host-Authoritative simulation loop (includes airborne jump frames!).
   const activePhase = snapshot?.phase ?? null;
   useEffect(() => {
     if (!isHost || !activePhase || activePhase === "finished") {
@@ -220,9 +356,13 @@ export default function ArenaRoomPage() {
 
       const phaseChanged = next.phase !== current.phase;
       const turnChanged = next.turnNumber !== current.turnNumber;
+      const anyAirborne =
+        next.fighters.some((f) => !f.grounded) ||
+        current.fighters.some((f) => !f.grounded);
       const shouldBroadcast =
         phaseChanged ||
         turnChanged ||
+        anyAirborne ||
         next.phase === "projectile" ||
         frameCounter % 15 === 0;
 
@@ -241,22 +381,38 @@ export default function ArenaRoomPage() {
     return () => window.clearInterval(interval);
   }, [isHost, activePhase]);
 
-  // 4. Claim match reward coins once the match finishes.
+  // 4. Victory/defeat audio & team reward claim once the match ends.
   useEffect(() => {
     if (
       !snapshot ||
+      !playerState ||
       snapshot.phase !== "finished" ||
-      !snapshot.winnerPlayerId ||
+      !snapshot.winnerTeamId ||
       rewardClaimedRef.current
     ) {
       return;
     }
 
     rewardClaimedRef.current = true;
+    const myFighter = snapshot.fighters.find(
+      (f) => f.playerId === playerState.profile.id
+    );
+    const didWin = myFighter?.teamId === snapshot.winnerTeamId;
+
+    if (didWin) {
+      soundEngine.playVictory();
+    } else {
+      soundEngine.playDefeat();
+    }
+
     fetch(`/api/rooms/${roomCode}/finish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ winnerPlayerId: snapshot.winnerPlayerId }),
+      body: JSON.stringify({
+        winnerTeamId: snapshot.winnerTeamId,
+        didWin,
+        winnerPlayerId: snapshot.winnerPlayerId ?? undefined,
+      }),
     })
       .then((res) => res.json())
       .then((data: { rewardCoins?: number }) => {
@@ -267,9 +423,25 @@ export default function ArenaRoomPage() {
       .catch(() => {
         // Non-fatal reward notification failure.
       });
-  }, [snapshot, roomCode]);
+  }, [snapshot, playerState, roomCode]);
 
-  // Send a player command locally (Host) or over Realtime Broadcast (Guest).
+  const dispatchLobbyAction = useCallback(
+    (action: LobbyActionMessage) => {
+      if (isHost) {
+        const connectedIds = participantsRef.current.map((p) => p.playerId);
+        const updated = applyLobbyAction(lobbyStateRef.current, action, connectedIds);
+        broadcastLobbyState(updated);
+      } else {
+        channelRef.current?.send({
+          type: "broadcast",
+          event: REALTIME_EVENTS.lobbyAction,
+          payload: action,
+        });
+      }
+    },
+    [isHost, broadcastLobbyState]
+  );
+
   const sendCommand = useCallback(
     (command: PlayerCommand) => {
       if (!playerState || !snapshotRef.current) {
@@ -278,6 +450,18 @@ export default function ArenaRoomPage() {
       if (snapshotRef.current.activePlayerId !== playerState.profile.id) {
         return;
       }
+
+      if (command.type === "move") {
+        soundEngine.playStep();
+      } else if (command.type === "jump") {
+        soundEngine.playJump();
+      } else if (command.type === "aim") {
+        soundEngine.playAimTick();
+      } else if (command.type === "fire") {
+        soundEngine.playGrenadeLaunch();
+      }
+
+      setRecenterNonce((n) => n + 1);
 
       if (isHost) {
         const updated = applyPlayerCommand(
@@ -300,7 +484,6 @@ export default function ArenaRoomPage() {
     [playerState, isHost, broadcastSnapshot]
   );
 
-  // Charge power bar smoothly while holding Space or the Fire button.
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (!chargingRef.current) {
@@ -309,7 +492,8 @@ export default function ArenaRoomPage() {
       const nextPower = Math.min(1, chargeValueRef.current + 0.04);
       chargeValueRef.current = nextPower;
       setChargePower(nextPower);
-    }, 35);
+      soundEngine.playChargeTick(nextPower);
+    }, 45);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -331,7 +515,7 @@ export default function ArenaRoomPage() {
     sendCommand({ type: "fire", powerRatio: power });
   }, [sendCommand]);
 
-  // Keyboard controls for smooth desktop gameplay.
+  // Keyboard controls: WASD or Arrow keys + Shift to jump + Space to charge/fire.
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const current = snapshotRef.current;
@@ -346,6 +530,14 @@ export default function ArenaRoomPage() {
         (f) => f.playerId === playerState.profile.id
       );
       if (!myFighter) {
+        return;
+      }
+
+      if (event.key === "Shift") {
+        if (!event.repeat) {
+          event.preventDefault();
+          sendCommand({ type: "jump" });
+        }
         return;
       }
 
@@ -390,15 +582,38 @@ export default function ArenaRoomPage() {
     };
   }, [playerState, sendCommand, beginCharge, releaseFire]);
 
+  const startValidation = useMemo(
+    () =>
+      validateMatchStart(
+        lobbyState,
+        participants.map((p) => p.playerId)
+      ),
+    [lobbyState, participants]
+  );
+
   function handleStartMatch() {
-    if (!isHost || !room || !hostPresence || !guestPresence) {
+    if (!isHost || !room || !startValidation.canStart) {
       return;
     }
+
+    const matchParticipants = participants.map((p) => ({
+      playerId: p.playerId,
+      displayName: p.displayName,
+      role: p.role,
+      teamId: lobbyState.assignments[p.playerId] ?? "team1",
+      stats: p.stats,
+      rarityAccent: p.rarityAccent,
+      appearance: p.appearance,
+    }));
+
+    const matchSeed =
+      (room.terrain_seed + Math.floor(Math.random() * 100000)) >>> 0;
+
     const initial = createInitialMatchState(
       room.code,
-      room.terrain_seed,
-      hostPresence,
-      guestPresence
+      matchSeed,
+      matchParticipants,
+      lobbyState.teams
     );
     snapshotRef.current = initial;
     setSnapshot(initial);
@@ -413,6 +628,21 @@ export default function ArenaRoomPage() {
     await navigator.clipboard.writeText(roomCode);
     setCopiedCode(true);
     window.setTimeout(() => setCopiedCode(false), 1800);
+  }
+
+  async function toggleBrowserFullscreen() {
+    if (!arenaShellRef.current) {
+      return;
+    }
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await arenaShellRef.current.requestFullscreen();
+      }
+    } catch {
+      // Ignore fullscreen denial in restricted iframes.
+    }
   }
 
   if (errorMessage) {
@@ -437,27 +667,26 @@ export default function ArenaRoomPage() {
     );
   }
 
-  const myFighter = snapshot?.fighters.find(
-    (f) => f.playerId === playerState.profile.id
-  );
-  const isMyTurn =
-    snapshot?.phase === "aiming" &&
-    snapshot.activePlayerId === playerState.profile.id;
-  const winnerFighter = snapshot?.fighters.find(
-    (f) => f.playerId === snapshot.winnerPlayerId
-  );
+  // Lobby View (up to 4 players, customizable teams with mutually exclusive colors)
+  if (!snapshot) {
+    const team1Members = participants.filter(
+      (p) => (lobbyState.assignments[p.playerId] ?? "team1") === "team1"
+    );
+    const team2Members = participants.filter(
+      (p) => lobbyState.assignments[p.playerId] === "team2"
+    );
+    const myTeamId: TeamId =
+      lobbyState.assignments[playerState.profile.id] ?? "team1";
 
-  return (
-    <div className="min-h-screen">
-      <Navbar
-        displayName={playerState.profile.displayName}
-        coins={playerState.profile.coins}
-        freePacks={playerState.profile.freePacks}
-      />
+    return (
+      <div className="min-h-screen">
+        <Navbar
+          displayName={playerState.profile.displayName}
+          coins={playerState.profile.coins}
+          freePacks={playerState.profile.freePacks}
+        />
 
-      <main className="mx-auto max-w-6xl space-y-5 px-4 py-6">
-        {/* Waiting Lobby */}
-        {!snapshot && (
+        <main className="mx-auto max-w-6xl px-4 py-8">
           <section className="rounded-2xl border border-emerald-500/40 bg-slate-900/90 p-6 shadow-2xl">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -467,14 +696,14 @@ export default function ArenaRoomPage() {
                     : "Conectado como Invitado"}
                 </span>
                 <h1 className="mt-1 text-2xl font-black text-white">
-                  Sala de Combate
+                  Sala por Equipos · {startValidation.modeLabel}
                 </h1>
               </div>
 
               <div className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5">
                 <div>
                   <div className="text-[10px] font-bold uppercase text-slate-400">
-                    Codigo de Sala
+                    Codigo de Sala (Max 4)
                   </div>
                   <div className="font-mono text-2xl font-black tracking-widest text-emerald-300">
                     {room.code}
@@ -490,274 +719,572 @@ export default function ArenaRoomPage() {
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <LobbyParticipantCard
-                title="Jugador 1 (Host / Servidor)"
-                participant={hostPresence}
-                accent="emerald"
+            <div className="mt-6 grid gap-5 lg:grid-cols-2">
+              <TeamLobbyCard
+                team={lobbyState.teams.team1}
+                otherTeamColor={lobbyState.teams.team2.colorKey}
+                members={team1Members}
+                isMember={myTeamId === "team1"}
+                canEdit={isHost || myTeamId === "team1"}
+                canJoin={myTeamId !== "team1" && team1Members.length < 2}
+                onJoin={() =>
+                  dispatchLobbyAction({
+                    type: "switch_team",
+                    playerId: playerState.profile.id,
+                    targetTeam: "team1",
+                  })
+                }
+                onColorChange={(colorKey) =>
+                  dispatchLobbyAction({
+                    type: "set_team_color",
+                    teamId: "team1",
+                    colorKey,
+                  })
+                }
+                onNameChange={(name) =>
+                  dispatchLobbyAction({
+                    type: "set_team_name",
+                    teamId: "team1",
+                    name,
+                  })
+                }
               />
-              <LobbyParticipantCard
-                title="Jugador 2 (Invitado)"
-                participant={guestPresence}
-                accent="sky"
+
+              <TeamLobbyCard
+                team={lobbyState.teams.team2}
+                otherTeamColor={lobbyState.teams.team1.colorKey}
+                members={team2Members}
+                isMember={myTeamId === "team2"}
+                canEdit={isHost || myTeamId === "team2"}
+                canJoin={myTeamId !== "team2" && team2Members.length < 2}
+                onJoin={() =>
+                  dispatchLobbyAction({
+                    type: "switch_team",
+                    playerId: playerState.profile.id,
+                    targetTeam: "team2",
+                  })
+                }
+                onColorChange={(colorKey) =>
+                  dispatchLobbyAction({
+                    type: "set_team_color",
+                    teamId: "team2",
+                    colorKey,
+                  })
+                }
+                onNameChange={(name) =>
+                  dispatchLobbyAction({
+                    type: "set_team_name",
+                    teamId: "team2",
+                    name,
+                  })
+                }
               />
             </div>
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-800 pt-5">
-              <p className="text-xs text-slate-300">
-                {hostPresence && guestPresence
-                  ? isHost
-                    ? "Ambos jugadores estan listos. Pulsa Iniciar Combate."
-                    : "Esperando a que el Host inicie la partida..."
-                  : "Comparte el codigo de 6 caracteres con otro jugador en otra computadora."}
-              </p>
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-white">
+                  {startValidation.reason}
+                </p>
+                <p className="text-xs text-slate-400">
+                  2 jugadores = 1 vs 1 · 3 jugadores = espera al 4.º · 4 jugadores = 2 vs 2
+                </p>
+              </div>
 
               {isHost && (
                 <button
                   type="button"
-                  disabled={!hostPresence || !guestPresence}
+                  disabled={!startValidation.canStart}
                   onClick={handleStartMatch}
                   className="rounded-xl bg-emerald-500 px-6 py-3 text-sm font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Iniciar Combate
+                  Iniciar Combate (Pantalla Completa)
                 </button>
               )}
             </div>
           </section>
-        )}
+        </main>
+      </div>
+    );
+  }
 
-        {/* Active Match Arena */}
-        {snapshot && (
-          <section className="space-y-4">
-            {/* Top HUD */}
-            <div className="grid items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4 md:grid-cols-3">
-              {snapshot.fighters[0] && (
-                <FighterHudCard fighter={snapshot.fighters[0]} align="left" />
-              )}
+  const myFighter = snapshot.fighters.find(
+    (f) => f.playerId === playerState.profile.id
+  );
+  const activeFighter = snapshot.fighters.find(
+    (f) => f.playerId === snapshot.activePlayerId
+  );
+  const isMyTurn =
+    snapshot.phase === "aiming" &&
+    snapshot.activePlayerId === playerState.profile.id;
+  const team1Fighters = snapshot.fighters.filter((f) => f.teamId === "team1");
+  const team2Fighters = snapshot.fighters.filter((f) => f.teamId === "team2");
+  const winningTeamConfig = snapshot.winnerTeamId
+    ? snapshot.teams[snapshot.winnerTeamId]
+    : null;
 
-              <div className="text-center">
-                <div
-                  className={`inline-block rounded-full px-4 py-1 text-xs font-black tracking-wider ${
-                    snapshot.phase === "finished"
-                      ? "bg-amber-400/20 text-amber-200"
-                      : isMyTurn
-                        ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/50"
-                        : "bg-slate-800 text-slate-300"
-                  }`}
-                >
-                  {snapshot.phase === "finished"
-                    ? "COMBATE FINALIZADO"
-                    : isMyTurn
-                      ? "TU TURNO"
-                      : "TURNO DEL RIVAL"}
-                </div>
-                <div className="mt-1 font-mono text-2xl font-black text-white">
-                  {Math.ceil(snapshot.turnSecondsLeft)}s
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Turno #{snapshot.turnNumber} · Sala {room.code}
-                </div>
-              </div>
+  // Fullscreen 100vw x 100vh Immersive Game View
+  return (
+    <div
+      ref={arenaShellRef}
+      className="fixed inset-0 z-50 h-screen w-screen overflow-hidden bg-slate-950 select-none"
+    >
+      <ArenaCanvas
+        snapshot={snapshot}
+        localPlayerId={playerState.profile.id}
+        chargePower={chargePower}
+        recenterNonce={recenterNonce}
+        resetViewNonce={resetViewNonce}
+      />
 
-              {snapshot.fighters[1] && (
-                <FighterHudCard fighter={snapshot.fighters[1]} align="right" />
-              )}
+      {/* Top Floating Team HUD */}
+      <header className="pointer-events-none absolute top-3 right-3 left-3 z-20 flex flex-wrap items-start justify-between gap-3">
+        <div className="pointer-events-auto flex flex-1 items-center gap-3 rounded-2xl border border-slate-700/70 bg-slate-950/85 px-4 py-2.5 shadow-xl backdrop-blur md:max-w-3xl">
+          <div className="flex-1">
+            <TeamHudCard
+              team={snapshot.teams.team1}
+              fighters={team1Fighters}
+              activePlayerId={snapshot.activePlayerId}
+              align="left"
+            />
+          </div>
+
+          <div className="px-2 text-center">
+            <div
+              className={`inline-block rounded-full px-3 py-0.5 text-[11px] font-black tracking-wider ${
+                snapshot.phase === "finished"
+                  ? "bg-amber-400/20 text-amber-200"
+                  : isMyTurn
+                    ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/50"
+                    : "bg-slate-800 text-slate-300"
+              }`}
+            >
+              {snapshot.phase === "finished"
+                ? "FINALIZADO"
+                : isMyTurn
+                  ? "TU TURNO"
+                  : `TURNO: ${activeFighter?.displayName ?? "RIVAL"}`}
+            </div>
+            <div className="mt-0.5 font-mono text-xl font-black text-white">
+              {Math.ceil(snapshot.turnSecondsLeft)}s
+            </div>
+            <div className="text-[10px] text-slate-400">
+              T#{snapshot.turnNumber} · {room.code}
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <TeamHudCard
+              team={snapshot.teams.team2}
+              fighters={team2Fighters}
+              activePlayerId={snapshot.activePlayerId}
+              align="right"
+            />
+          </div>
+        </div>
+
+        {/* Utility Floating Buttons */}
+        <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-slate-700/70 bg-slate-950/85 p-1.5 shadow-xl backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setResetViewNonce((n) => n + 1)}
+            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-800"
+            title="Centrar camara y restablecer zoom al 100%"
+          >
+            Centrar
+          </button>
+          <button
+            type="button"
+            onClick={() => setMuted(soundEngine.toggleMute())}
+            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-800"
+          >
+            {muted ? "Audio: OFF" : "Audio: ON"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleBrowserFullscreen}
+            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-emerald-300 hover:bg-slate-800"
+          >
+            {isFullscreen ? "Ventana" : "Pantalla Completa"}
+          </button>
+          <Link
+            href="/menu"
+            className="rounded-xl px-2.5 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/20"
+          >
+            Salir
+          </Link>
+        </div>
+      </header>
+
+      {/* Bottom Floating Tactical Controls (including Shift Jump) */}
+      {snapshot.phase !== "finished" && myFighter && (
+        <footer className="pointer-events-none absolute right-3 bottom-3 left-3 z-20 flex justify-center">
+          <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2.5 rounded-2xl border border-slate-700/75 bg-slate-950/85 px-4 py-2.5 shadow-2xl backdrop-blur">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={!isMyTurn}
+                onClick={() => sendCommand({ type: "move", direction: -1 })}
+                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:border-emerald-400 disabled:opacity-40"
+              >
+                ← A
+              </button>
+              <button
+                type="button"
+                disabled={!isMyTurn}
+                onClick={() => sendCommand({ type: "move", direction: 1 })}
+                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:border-emerald-400 disabled:opacity-40"
+              >
+                D →
+              </button>
+              <button
+                type="button"
+                disabled={!isMyTurn || !myFighter.grounded}
+                onClick={() => sendCommand({ type: "jump" })}
+                className="rounded-xl border border-violet-400/50 bg-violet-500/20 px-3 py-2 text-xs font-bold text-violet-200 hover:bg-violet-500/30 disabled:opacity-40"
+              >
+                Saltar (SHIFT)
+              </button>
+              <button
+                type="button"
+                disabled={!isMyTurn}
+                onClick={() =>
+                  sendCommand({
+                    type: "aim",
+                    angleDeg: myFighter.aimAngleDeg + 5,
+                  })
+                }
+                className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs font-bold text-white hover:border-sky-400 disabled:opacity-40"
+              >
+                ↑ W
+              </button>
+              <button
+                type="button"
+                disabled={!isMyTurn}
+                onClick={() =>
+                  sendCommand({
+                    type: "aim",
+                    angleDeg: myFighter.aimAngleDeg - 5,
+                  })
+                }
+                className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-2 text-xs font-bold text-white hover:border-sky-400 disabled:opacity-40"
+              >
+                ↓ S
+              </button>
             </div>
 
-            <ArenaCanvas
-              snapshot={snapshot}
-              localPlayerId={playerState.profile.id}
+            <ArtilleryDialGauge
+              aimAngleDeg={myFighter.aimAngleDeg}
               chargePower={chargePower}
             />
 
-            {/* Controls bar */}
-            {snapshot.phase !== "finished" && myFighter && (
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={!isMyTurn}
-                    onClick={() => sendCommand({ type: "move", direction: -1 })}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-bold text-white hover:border-emerald-400 disabled:opacity-40"
-                  >
-                    ← Mover (A)
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isMyTurn}
-                    onClick={() => sendCommand({ type: "move", direction: 1 })}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-xs font-bold text-white hover:border-emerald-400 disabled:opacity-40"
-                  >
-                    Mover (D) →
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isMyTurn}
-                    onClick={() =>
-                      sendCommand({
-                        type: "aim",
-                        angleDeg: myFighter.aimAngleDeg + 5,
-                      })
-                    }
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:border-sky-400 disabled:opacity-40"
-                  >
-                    Angulo + (W)
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isMyTurn}
-                    onClick={() =>
-                      sendCommand({
-                        type: "aim",
-                        angleDeg: myFighter.aimAngleDeg - 5,
-                      })
-                    }
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:border-sky-400 disabled:opacity-40"
-                  >
-                    Angulo - (S)
-                  </button>
-                  <span className="ml-2 text-xs text-slate-300">
-                    Angulo: <strong>{myFighter.aimAngleDeg}°</strong> · Energia:{" "}
-                    <strong>{myFighter.moveEnergyLeft}</strong>
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-28">
-                    <div className="mb-1 flex justify-between text-[10px] font-bold text-amber-300">
-                      <span>POTENCIA</span>
-                      <span>{Math.round(chargePower * 100)}%</span>
-                    </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 transition-all"
-                        style={{ width: `${Math.round(chargePower * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={!isMyTurn}
-                    onMouseDown={beginCharge}
-                    onMouseUp={releaseFire}
-                    onMouseLeave={releaseFire}
-                    onTouchStart={beginCharge}
-                    onTouchEnd={releaseFire}
-                    className="rounded-xl bg-amber-400 px-5 py-2.5 text-xs font-black text-slate-950 shadow-lg transition hover:bg-amber-300 disabled:opacity-40"
-                  >
-                    Mantener: Lanzar Granada (ESPACIO)
-                  </button>
-                </div>
+            <div className="flex items-center gap-2.5">
+              <div className="text-[11px] text-slate-300">
+                Energia:{" "}
+                <strong className="text-violet-300">
+                  {myFighter.moveEnergyLeft}
+                </strong>
               </div>
-            )}
-
-            {/* Victory Banner */}
-            {snapshot.phase === "finished" && (
-              <div className="rounded-2xl border border-amber-400/50 bg-gradient-to-r from-slate-900 via-amber-950/30 to-slate-900 p-6 text-center shadow-2xl">
-                <h2 className="text-2xl font-black text-amber-300">
-                  {winnerFighter?.playerId === playerState.profile.id
-                    ? "¡Victoria en la Arena!"
-                    : `Ganador: ${winnerFighter?.displayName ?? "Rival"}`}
-                </h2>
-                {rewardMessage && (
-                  <p className="mt-1 text-sm font-semibold text-emerald-300">
-                    {rewardMessage}
-                  </p>
-                )}
-                <div className="mt-4 flex justify-center gap-3">
-                  <Link
-                    href="/gacha"
-                    className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-black text-slate-950 hover:bg-amber-300"
-                  >
-                    Abrir Sobres TCG
-                  </Link>
-                  <Link
-                    href="/menu"
-                    className="rounded-xl border border-slate-700 px-5 py-2.5 text-sm font-bold text-white hover:border-emerald-400"
-                  >
-                    Volver al Menu
-                  </Link>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-      </main>
-    </div>
-  );
-}
-
-interface LobbyParticipantCardProps {
-  title: string;
-  participant: RoomPresencePayload | null;
-  accent: "emerald" | "sky";
-}
-
-function LobbyParticipantCard({
-  title,
-  participant,
-  accent,
-}: LobbyParticipantCardProps) {
-  const borderClass =
-    accent === "emerald" ? "border-emerald-500/40" : "border-sky-500/40";
-  return (
-    <div className={`rounded-xl border ${borderClass} bg-slate-950/70 p-4`}>
-      <div className="text-xs font-bold uppercase text-slate-400">{title}</div>
-      {participant ? (
-        <div className="mt-2 space-y-2">
-          <div className="text-lg font-black text-white">
-            {participant.displayName}
+              <button
+                type="button"
+                disabled={!isMyTurn}
+                onMouseDown={beginCharge}
+                onMouseUp={releaseFire}
+                onMouseLeave={releaseFire}
+                onTouchStart={beginCharge}
+                onTouchEnd={releaseFire}
+                className="rounded-xl bg-amber-400 px-5 py-2.5 text-xs font-black text-slate-950 shadow-lg shadow-amber-400/20 transition hover:bg-amber-300 disabled:opacity-40"
+              >
+                Mantener: Disparar (ESPACIO)
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs font-semibold">
-            <span className="rounded bg-slate-800 px-2 py-0.5 text-emerald-300">
-              HP {participant.stats.maxHp}
-            </span>
-            <span className="rounded bg-slate-800 px-2 py-0.5 text-rose-300">
-              ATK {participant.stats.attack}
-            </span>
-            <span className="rounded bg-slate-800 px-2 py-0.5 text-sky-300">
-              DEF {participant.stats.defense}
-            </span>
-            <span className="rounded bg-slate-800 px-2 py-0.5 text-violet-300">
-              MOV {participant.stats.mobility}
-            </span>
+        </footer>
+      )}
+
+      {/* Team Victory Overlay */}
+      {snapshot.phase === "finished" && winningTeamConfig && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <div
+            className="max-w-md rounded-2xl border-2 bg-slate-900 p-7 text-center shadow-2xl"
+            style={{ borderColor: winningTeamConfig.hex }}
+          >
+            <div
+              className="text-xs font-black uppercase tracking-widest"
+              style={{ color: winningTeamConfig.hex }}
+            >
+              {myFighter?.teamId === snapshot.winnerTeamId
+                ? "¡Victoria de tu equipo!"
+                : "Equipo Ganador"}
+            </div>
+            <h2
+              className="mt-1 text-3xl font-black"
+              style={{ color: winningTeamConfig.hex }}
+            >
+              {winningTeamConfig.name}
+            </h2>
+            {rewardMessage && (
+              <p className="mt-2 text-sm font-semibold text-emerald-300">
+                {rewardMessage}
+              </p>
+            )}
+            <div className="mt-6 flex justify-center gap-3">
+              <Link
+                href="/gacha"
+                className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-black text-slate-950 hover:bg-amber-300"
+              >
+                Abrir Sobres TCG
+              </Link>
+              <Link
+                href="/menu"
+                className="rounded-xl border border-slate-700 px-5 py-2.5 text-sm font-bold text-white hover:border-emerald-400"
+              >
+                Volver al Menu
+              </Link>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="mt-3 text-sm text-slate-400">
-          Esperando conexion...
         </div>
       )}
     </div>
   );
 }
 
-function FighterHudCard({
-  fighter,
-  align,
-}: {
-  fighter: MatchSnapshot["fighters"][number];
-  align: "left" | "right";
-}) {
-  const pct = Math.max(0, Math.min(100, Math.round((fighter.hp / fighter.maxHp) * 100)));
-  const color = fighter.role === "host" ? "bg-emerald-400" : "bg-sky-400";
+interface TeamLobbyCardProps {
+  team: TeamConfig;
+  otherTeamColor: TeamColorKey;
+  members: RoomPresencePayload[];
+  isMember: boolean;
+  canEdit: boolean;
+  canJoin: boolean;
+  onJoin: () => void;
+  onColorChange: (colorKey: TeamColorKey) => void;
+  onNameChange: (name: string) => void;
+}
+
+function TeamLobbyCard({
+  team,
+  otherTeamColor,
+  members,
+  isMember,
+  canEdit,
+  canJoin,
+  onJoin,
+  onColorChange,
+  onNameChange,
+}: TeamLobbyCardProps) {
   return (
-    <div className={align === "right" ? "text-right" : "text-left"}>
-      <div className="text-sm font-black text-white">
-        {fighter.displayName}{" "}
-        <span className="text-xs font-semibold text-slate-400">
-          ({fighter.hp}/{fighter.maxHp} HP)
+    <div
+      className="space-y-4 rounded-2xl border-2 bg-slate-950/80 p-4"
+      style={{ borderColor: `${team.hex}88` }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-1 items-center gap-2">
+          <span
+            className="h-3.5 w-3.5 shrink-0 rounded-full"
+            style={{ backgroundColor: team.hex }}
+          />
+          <input
+            type="text"
+            maxLength={18}
+            disabled={!canEdit}
+            value={team.name}
+            onChange={(e) => onNameChange(e.target.value)}
+            aria-label={`Nombre del ${team.name}`}
+            className="w-full rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-sm font-black text-white outline-none focus:border-white disabled:opacity-75"
+          />
+        </div>
+
+        <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-[11px] font-bold text-slate-200">
+          {members.length}/2
         </span>
       </div>
-      <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-slate-800">
+
+      {/* Exclusive color selector */}
+      <div className="space-y-1.5">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          Color del Equipo (Exclusivo)
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {TEAM_COLOR_PALETTE.map((option) => {
+            const isSelected = team.colorKey === option.key;
+            const takenByOther = otherTeamColor === option.key;
+            return (
+              <button
+                key={option.key}
+                type="button"
+                disabled={!canEdit || takenByOther}
+                onClick={() => onColorChange(option.key)}
+                title={takenByOther ? "En uso por el otro equipo" : option.label}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-bold transition ${
+                  isSelected
+                    ? "border-white bg-slate-800 text-white"
+                    : takenByOther
+                      ? "cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-600 line-through"
+                      : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
+                }`}
+              >
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: option.hex }}
+                />
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Team member slots (max 2) */}
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        {[0, 1].map((slotIdx) => {
+          const member = members[slotIdx];
+          if (!member) {
+            return (
+              <div
+                key={slotIdx}
+                className="flex h-24 items-center justify-center rounded-xl border border-dashed border-slate-800 text-xs text-slate-500"
+              >
+                Espacio libre ({slotIdx === 0 ? "1v1 / 2v2" : "2v2"})
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={member.playerId}
+              className="flex items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-900/90 p-2"
+            >
+              <LobbyCreaturePreview
+                appearance={member.appearance}
+                teamColor={team.hex}
+                facing={team.id === "team1" ? 1 : -1}
+              />
+              <div className="min-w-0">
+                <div className="truncate text-xs font-black text-white">
+                  {member.displayName}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  HP {member.stats.maxHp} · ATK {member.stats.attack}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  DEF {member.stats.defense} · MOV {member.stats.mobility}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-end">
+        {isMember ? (
+          <span className="text-[11px] font-bold text-emerald-300">
+            Estas en este equipo
+          </span>
+        ) : (
+          <button
+            type="button"
+            disabled={!canJoin}
+            onClick={onJoin}
+            className="rounded-xl border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-bold text-white hover:border-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {members.length >= 2 ? "Equipo lleno" : "Unirme a este equipo"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LobbyCreaturePreview({
+  appearance,
+  teamColor,
+  facing,
+}: {
+  appearance: CreatureAppearance;
+  teamColor: string;
+  facing: 1 | -1;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawAssembledCreature(ctx, {
+      x: canvas.width / 2,
+      y: canvas.height - 8,
+      facing,
+      aimAngleDeg: 40,
+      appearance,
+      teamColor,
+      scale: 1.15,
+      timeSec: 0,
+      isAlive: true,
+    });
+  }, [appearance, teamColor, facing]);
+
+  return <canvas ref={canvasRef} width={76} height={80} className="shrink-0" />;
+}
+
+function TeamHudCard({
+  team,
+  fighters,
+  activePlayerId,
+  align,
+}: {
+  team: TeamConfig;
+  fighters: MatchSnapshot["fighters"];
+  activePlayerId: string;
+  align: "left" | "right";
+}) {
+  const totalHp = fighters.reduce((acc, f) => acc + Math.max(0, f.hp), 0);
+  const totalMaxHp = Math.max(
+    1,
+    fighters.reduce((acc, f) => acc + f.maxHp, 0)
+  );
+  const pct = Math.max(0, Math.min(100, Math.round((totalHp / totalMaxHp) * 100)));
+
+  return (
+    <div className={align === "right" ? "text-right" : "text-left"}>
+      <div
+        className="truncate text-xs font-black sm:text-sm"
+        style={{ color: team.hex }}
+      >
+        {team.name}{" "}
+        <span className="text-[11px] font-semibold text-slate-300">
+          ({totalHp}/{totalMaxHp})
+        </span>
+      </div>
+      <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-slate-800">
         <div
-          className={`h-full transition-all ${color}`}
-          style={{ width: `${pct}%` }}
+          className="h-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: team.hex }}
         />
       </div>
-      <div className="mt-1 text-[11px] text-slate-400">
-        ATK {fighter.attack} · DEF {fighter.defense} · MOV {fighter.mobility}
+      <div
+        className={`mt-1 flex flex-wrap gap-1.5 text-[10px] ${
+          align === "right" ? "justify-end" : "justify-start"
+        }`}
+      >
+        {fighters.map((fighter) => (
+          <span
+            key={fighter.playerId}
+            className={`rounded px-1.5 py-0.5 font-semibold ${
+              fighter.playerId === activePlayerId
+                ? "bg-amber-400/20 text-amber-200 ring-1 ring-amber-400/50"
+                : "bg-slate-900 text-slate-300"
+            }`}
+          >
+            {fighter.displayName}: {fighter.hp}
+          </span>
+        ))}
       </div>
     </div>
   );
